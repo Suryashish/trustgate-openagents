@@ -1,0 +1,18 @@
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+BASE_RPC_URL = os.getenv("BASE_RPC_URL", "")
+PRIVATE_KEY = os.getenv("PRIVATE_KEY", "")
+KEEPERHUB_API_KEY = os.getenv("KEEPERHUB_API_KEY", "")
+AXL_NODE_PORT = int(os.getenv("AXL_NODE_PORT", "9002"))
+
+IDENTITY_REGISTRY_ADDRESS = os.getenv(
+    "IDENTITY_REGISTRY_ADDRESS",
+    "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
+)
+REPUTATION_REGISTRY_ADDRESS = os.getenv(
+    "REPUTATION_REGISTRY_ADDRESS",
+    "0x8004B663056A597Dffe9eCcC1965A193B7388713",
+)
