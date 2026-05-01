@@ -93,6 +93,9 @@ func applyOverrides(base *ApiConfig, ov ApiConfig) {
 	if ov.A2AAddr != "" {
 		base.A2AAddr = ov.A2AAddr
 	}
+	if ov.A2APort != 0 {
+		base.A2APort = ov.A2APort
+	}
 	if ov.MaxMessageSize != 0 {
 		base.MaxMessageSize = ov.MaxMessageSize
 	}

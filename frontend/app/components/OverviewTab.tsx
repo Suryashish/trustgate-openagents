@@ -87,14 +87,14 @@ export function OverviewTab({
               <span className="text-zinc-500"> · Reputation Registry → ranked list (60/20/20)</span>
             </li>
             <li>
-              <span className="mr-2 text-zinc-600">4.</span>
-              <span className="font-medium text-zinc-500">Hire &amp; deliver</span>
-              <span className="text-zinc-600"> · Phase 4 (AXL A2A roundtrip)</span>
+              <span className="mr-2 text-emerald-400">4.</span>
+              <span className="font-medium">Hire &amp; deliver</span>
+              <span className="text-zinc-500"> · AXL A2A SendMessage + retry/fallback to runner-up</span>
             </li>
             <li>
-              <span className="mr-2 text-zinc-600">5.</span>
-              <span className="font-medium text-zinc-500">Settle &amp; record</span>
-              <span className="text-zinc-600"> · Phase 5 (KeeperHub + write reputation)</span>
+              <span className="mr-2 text-emerald-400">5.</span>
+              <span className="font-medium">Settle &amp; record</span>
+              <span className="text-zinc-500"> · KeeperHub workflow + giveFeedback onchain</span>
             </li>
           </ol>
         </div>
@@ -142,6 +142,11 @@ export function OverviewTab({
           <li>
             <span className="text-zinc-200">AXL Bridge</span> · view the local AXL nodes&apos; topology and
             replay the Phase 1 send-job loop end-to-end.
+          </li>
+          <li>
+            <span className="text-zinc-200">Settle</span> · Phase 5 — drive the full
+            hire → A2A → settle → write_feedback pipeline. Also exposes settle_payment
+            and giveFeedback as separate panels with stub / dry-run modes.
           </li>
         </ul>
       </section>

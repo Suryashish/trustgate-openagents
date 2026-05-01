@@ -34,9 +34,14 @@ import requests as http_requests
 # ensure relative imports work whether invoked from repo root or app/
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from axl_gateway import recv_blocking, send_job, topology  # noqa: E402
+from axl_gateway import A2AError, fetch_agent_card, recv_blocking, send_a2a_task, send_job, topology  # noqa: E402
 from config import AXL_NODE_PORT, BASE_RPC_URL, IDENTITY_REGISTRY_ADDRESS, NETWORK, REPUTATION_REGISTRY_ADDRESS  # noqa: E402
-from hiring import find_best_agent, select_top  # noqa: E402
+from hiring import complete_hire_loop, find_best_agent, hire_and_deliver, select_top  # noqa: E402
+from keeper_client import (  # noqa: E402
+    KEEPERHUB_NETWORK, KEEPERHUB_PAYER_TOKEN,
+    settle_payment as keeper_settle_payment,
+    write_feedback as keeper_write_feedback,
+)
 from registry_client import RegistryClient, resolve_agent_card  # noqa: E402
 
 app = Flask(__name__)
@@ -249,6 +254,185 @@ def axl_topology():
         return jsonify({"api_port": api_port, "topology": topology(api_port)})
     except http_requests.exceptions.RequestException as e:
         return jsonify({"api_port": api_port, "error": f"{type(e).__name__}: {e}"}), 502
+
+
+@app.get("/api/axl/agent-card")
+def axl_agent_card():
+    api_port = int(request.args.get("api_port", AXL_NODE_PORT))
+    peer = request.args.get("peer", "")
+    if not peer:
+        return jsonify({"error": "missing 'peer'"}), 400
+    try:
+        return jsonify({"api_port": api_port, "peer": peer, "card": fetch_agent_card(peer, api_port=api_port)})
+    except http_requests.exceptions.RequestException as e:
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 502
+
+
+@app.post("/api/axl/a2a")
+def axl_a2a():
+    """Phase 4: send a single A2A SendMessage envelope. Useful for poking workers."""
+    body = request.get_json(force=True, silent=True) or {}
+    peer = body.get("peer", "")
+    service = body.get("service", "uppercase_text")
+    inner = body.get("inner_request") or {"params": {"input": body.get("input", "trustgate phase 4")}}
+    api_port = int(body.get("api_port", AXL_NODE_PORT))
+    timeout = float(body.get("timeout", 10.0))
+    if not peer:
+        return jsonify({"error": "missing 'peer'"}), 400
+    try:
+        reply = send_a2a_task(peer, service, inner, api_port=api_port, timeout=timeout)
+    except A2AError as e:
+        return jsonify({"ok": False, "error": str(e)}), 502
+    return jsonify({"ok": True, "peer": peer, "service": service, "reply": reply})
+
+
+@app.post("/api/hire")
+def post_hire():
+    """Phase 4: discover + rank + deliver, with retry/fallback."""
+    body = request.get_json(force=True, silent=True) or {}
+    capability = body.get("capability") or ""
+    service = body.get("service") or "uppercase_text"
+    inner = body.get("inner_request")
+    if inner is None:
+        inner = {"params": {"input": body.get("input", "trustgate phase 4 hire")}}
+    a2a_timeout = float(body.get("a2a_timeout", 10.0))
+    max_attempts = int(body.get("max_attempts", 3))
+    api_port = int(body.get("api_port", AXL_NODE_PORT))
+
+    extra = body.get("extra_candidates") or []
+    # `candidates` present (even empty list) means "skip discovery". Use
+    # `is None` so an explicit empty list is honoured.
+    candidates_in = body.get("candidates", None)
+
+    discovered = None
+    if candidates_in is None:
+        if not capability:
+            return jsonify({"error": "either capability or candidates is required"}), 400
+        discovered = find_best_agent(
+            capability=capability,
+            budget=float(body.get("budget", 1.0)),
+            min_reputation=float(body.get("min_reputation", 0.0)),
+            require_feedback=bool(body.get("require_feedback", False)),
+            limit_candidates=int(body.get("limit", 10)),
+        )
+
+    out = hire_and_deliver(
+        capability=capability,
+        service=service,
+        inner_request=inner,
+        candidates=discovered if candidates_in is None else candidates_in,
+        extra_candidates=extra,
+        a2a_timeout=a2a_timeout,
+        max_attempts=max_attempts,
+        api_port=api_port,
+    )
+    return jsonify(out.to_dict())
+
+
+@app.get("/api/settlement/status")
+def settlement_status():
+    """Phase 5: report whether KeeperHub credentials + a signing key are configured."""
+    has_pk = bool(os.getenv("PRIVATE_KEY", ""))
+    has_keeper_key = bool(os.getenv("KEEPERHUB_API_KEY", ""))
+    rc = client()
+    chain_id = rc.chain_id
+    out = {
+        "keeperhub": {
+            "api_key_configured": has_keeper_key,
+            "mode": "live" if has_keeper_key else "stub",
+            "network": KEEPERHUB_NETWORK,
+            "token": KEEPERHUB_PAYER_TOKEN,
+        },
+        "feedback_signer": {
+            "private_key_configured": has_pk,
+            "mode": "live" if has_pk else "dry_run",
+            "chain_id": chain_id,
+        },
+    }
+    if has_pk:
+        from eth_account import Account
+        try:
+            acct = Account.from_key(os.getenv("PRIVATE_KEY"))
+            balance = rc.w3.eth.get_balance(acct.address)
+            out["feedback_signer"]["address"] = acct.address
+            out["feedback_signer"]["balance_wei"] = int(balance)
+            out["feedback_signer"]["balance_eth"] = float(rc.w3.from_wei(balance, "ether"))
+        except Exception as e:
+            out["feedback_signer"]["error"] = f"{type(e).__name__}: {e}"
+    return jsonify(out)
+
+
+@app.post("/api/settle")
+def post_settle():
+    body = request.get_json(force=True, silent=True) or {}
+    wallet = body.get("agent_wallet") or ""
+    amount = float(body.get("amount_usdc", 0.1))
+    force_stub = bool(body.get("force_stub", False))
+    res = keeper_settle_payment(wallet, amount, force_stub=force_stub)
+    return jsonify(res.to_dict())
+
+
+@app.post("/api/write-feedback")
+def post_write_feedback():
+    body = request.get_json(force=True, silent=True) or {}
+    agent_id = body.get("agent_id")
+    if agent_id is None:
+        return jsonify({"error": "agent_id is required"}), 400
+    score = float(body.get("score", 0.95))
+    tags = body.get("tags") or ["trustgate"]
+    endpoint_str = body.get("endpoint", "") or ""
+    feedback_uri = body.get("feedback_uri", "") or ""
+    feedback_payload = body.get("feedback_payload")
+    res = keeper_write_feedback(
+        int(agent_id), score,
+        tags=tags, endpoint=endpoint_str,
+        feedback_uri=feedback_uri, feedback_payload=feedback_payload,
+        client=client(),
+    )
+    return jsonify(res.to_dict())
+
+
+@app.post("/api/complete-hire")
+def post_complete_hire():
+    """Phase 5 entry point — discover → deliver → settle → write feedback."""
+    body = request.get_json(force=True, silent=True) or {}
+    capability = body.get("capability") or ""
+    service = body.get("service") or "uppercase_text"
+    inner = body.get("inner_request")
+    if inner is None:
+        inner = {"params": {"input": body.get("input", "trustgate phase 5")}}
+
+    extra = body.get("extra_candidates") or []
+    candidates_in = body.get("candidates", None)
+    discovered = None
+    if candidates_in is None:
+        if not capability:
+            return jsonify({"error": "either capability or candidates is required"}), 400
+        discovered = find_best_agent(
+            capability=capability,
+            budget=float(body.get("budget", 1.0)),
+            min_reputation=float(body.get("min_reputation", 0.0)),
+            require_feedback=bool(body.get("require_feedback", False)),
+            limit_candidates=int(body.get("limit", 10)),
+            client=client(),
+        )
+
+    out = complete_hire_loop(
+        capability=capability, service=service, inner_request=inner,
+        candidates=discovered if candidates_in is None else candidates_in,
+        extra_candidates=extra,
+        a2a_timeout=float(body.get("a2a_timeout", 10.0)),
+        max_attempts=int(body.get("max_attempts", 3)),
+        api_port=int(body.get("api_port", AXL_NODE_PORT)),
+        payment_amount_usdc=float(body.get("payment_amount_usdc", 0.1)),
+        feedback_score=float(body.get("feedback_score", 0.95)),
+        feedback_tags=body.get("feedback_tags"),
+        feedback_endpoint=body.get("feedback_endpoint"),
+        write_feedback_onchain=bool(body.get("write_feedback_onchain", True)),
+        force_stub_settlement=bool(body.get("force_stub_settlement", False)),
+        client=client(),
+    )
+    return jsonify(out.to_dict())
 
 
 @app.post("/api/axl/send-job")

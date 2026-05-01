@@ -278,6 +278,132 @@ class RegistryClient:
             "trust_level": avg_trust,
         }
 
+    # ----- Phase 5: writing feedback ---------------------------------------
+    #
+    # giveFeedback(uint256 agentId, int128 value, uint8 valueDecimals,
+    #              string tag1, string tag2, string endpoint,
+    #              string feedbackURI, bytes32 feedbackHash)
+    #
+    # We accept score in [0, 1] and convert to the contract's int128 raw
+    # representation: raw = round(score * 100) - 100  (see SCORE_MIN/SCORE_MAX
+    # and _normalise_score above; this is the inverse).
+    def _score_to_raw(self, normalised_score: float) -> int:
+        s = max(0.0, min(1.0, float(normalised_score)))
+        # map [0, 1] -> [-100, 100]
+        return int(round(s * (self.SCORE_MAX - self.SCORE_MIN) + self.SCORE_MIN))
+
+    def build_feedback_tx(
+        self,
+        agent_id: int,
+        score: float,
+        *,
+        from_address: str,
+        tag1: str = "trustgate",
+        tag2: str = "",
+        endpoint: str = "",
+        feedback_uri: str = "",
+        feedback_hash: bytes = b"\x00" * 32,
+        value_decimals: int = 0,
+        gas: int = 300_000,
+        max_fee_per_gas: int | None = None,
+        max_priority_fee_per_gas: int | None = None,
+    ) -> dict:
+        """Build (but do NOT send) a giveFeedback transaction.
+
+        Returns a tx dict ready for `eth_signTransaction`. Useful for both
+        signing locally and for the dashboard's "show me what would happen" mode.
+        """
+        from_address = Web3.to_checksum_address(from_address)
+        value = self._score_to_raw(score)
+        if isinstance(feedback_hash, str):
+            fb_hash = bytes.fromhex(feedback_hash[2:] if feedback_hash.startswith("0x") else feedback_hash)
+        else:
+            fb_hash = bytes(feedback_hash)
+        if len(fb_hash) != 32:
+            fb_hash = (fb_hash + b"\x00" * 32)[:32]
+
+        fn = self.reputation.functions.giveFeedback(
+            int(agent_id), int(value), int(value_decimals),
+            str(tag1), str(tag2), str(endpoint),
+            str(feedback_uri), fb_hash,
+        )
+        nonce = self.w3.eth.get_transaction_count(from_address, "pending")
+        try:
+            fees = self.w3.eth.fee_history(1, "latest")
+            base = fees["baseFeePerGas"][-1]
+            tip = self.w3.to_wei(1, "gwei")
+            mfpg = max_fee_per_gas if max_fee_per_gas is not None else int(base * 2 + tip)
+            mpfg = max_priority_fee_per_gas if max_priority_fee_per_gas is not None else tip
+        except Exception:
+            mfpg = max_fee_per_gas or self.w3.to_wei(2, "gwei")
+            mpfg = max_priority_fee_per_gas or self.w3.to_wei(1, "gwei")
+
+        tx = fn.build_transaction({
+            "from": from_address,
+            "nonce": nonce,
+            "gas": gas,
+            "maxFeePerGas": mfpg,
+            "maxPriorityFeePerGas": mpfg,
+            "chainId": self.chain_id,
+        })
+        return tx
+
+    def send_feedback(
+        self,
+        agent_id: int,
+        score: float,
+        *,
+        private_key: Optional[str] = None,
+        wait_for_receipt: bool = True,
+        receipt_timeout: float = 120.0,
+        **kwargs,
+    ) -> dict:
+        """Sign and broadcast a giveFeedback tx.
+
+        Returns one of:
+          - {"mode": "dry_run", "tx": {...}, "calldata": "0x..."}
+              when no private_key is provided (and PRIVATE_KEY env var is empty).
+          - {"mode": "live", "tx_hash": "0x...", "block_number": N, "status": 1}
+              when broadcast succeeded.
+
+        Raises if signing/broadcasting itself errors.
+        """
+        pk = private_key or os.getenv("PRIVATE_KEY", "")
+        if not pk:
+            # build for the zero address so callers can inspect the calldata
+            tx = self.build_feedback_tx(
+                agent_id, score, from_address="0x" + "0" * 40, **kwargs,
+            )
+            return {
+                "mode": "dry_run",
+                "tx": {k: (hex(v) if isinstance(v, int) and k != "chainId" else v) for k, v in tx.items()},
+                "calldata": tx["data"],
+                "note": "set PRIVATE_KEY in .env to sign and broadcast",
+            }
+
+        from eth_account import Account
+        acct = Account.from_key(pk)
+        tx = self.build_feedback_tx(agent_id, score, from_address=acct.address, **kwargs)
+        signed = acct.sign_transaction(tx)
+        tx_hash = self.w3.eth.send_raw_transaction(signed.raw_transaction)
+        result = {
+            "mode": "live",
+            "from": acct.address,
+            "tx_hash": tx_hash.hex(),
+            "submitted_at_block": self.w3.eth.block_number,
+        }
+        if wait_for_receipt:
+            try:
+                receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=receipt_timeout)
+                result["block_number"] = int(receipt.blockNumber)
+                result["status"] = int(receipt.status)
+                result["gas_used"] = int(receipt.gasUsed)
+            except Exception as e:
+                result["receipt_error"] = f"{type(e).__name__}: {e}"
+        return result
+
+    # ----- read helpers (Phase 3) -----------------------------------------
+
     def get_recent_feedback(self, agent_id: int, *, limit: int = 10) -> list[dict]:
         """Pull individual feedback rows for display purposes."""
         clients = self.get_clients(agent_id)

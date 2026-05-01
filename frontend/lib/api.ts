@@ -131,6 +131,107 @@ export type AxlSendJobResult = {
   error?: string;
 };
 
+export type SyntheticCandidate = {
+  agent_id: number;
+  name: string;
+  axl_pubkey: string;
+  endpoints: { name: string; endpoint: string }[];
+  reputation?: number;
+  feedback_count?: number;
+  trust_level?: number;
+  price?: number;
+  latency_hint?: number;
+};
+
+export type HireAttempt = {
+  candidate: Record<string, unknown>;
+  ok: boolean;
+  reply: Record<string, unknown> | null;
+  error: string | null;
+  elapsed_seconds: number;
+};
+
+export type HireResult = {
+  capability: string;
+  service: string;
+  inner_request: Record<string, unknown>;
+  candidates: Record<string, unknown>[];
+  attempts: HireAttempt[];
+  winner_index: number | null;
+  final_reply: Record<string, unknown> | null;
+};
+
+export type AxlAgentCard = {
+  api_port: number;
+  peer: string;
+  card: Record<string, unknown>;
+};
+
+export type AxlA2AResult = {
+  ok: boolean;
+  peer?: string;
+  service?: string;
+  reply?: Record<string, unknown>;
+  error?: string;
+};
+
+export type SettlementStatus = {
+  keeperhub: {
+    api_key_configured: boolean;
+    mode: "live" | "stub";
+    network: string;
+    token: string;
+  };
+  feedback_signer: {
+    private_key_configured: boolean;
+    mode: "live" | "dry_run";
+    chain_id: number;
+    address?: string;
+    balance_wei?: number;
+    balance_eth?: number;
+    error?: string;
+  };
+};
+
+export type SettlementResult = {
+  mode: "stub" | "live-mcp" | "live-api";
+  workflow_id: string;
+  status: "executed" | "pending" | "failed";
+  agent_wallet: string;
+  amount: number;
+  token: string;
+  network: string;
+  tx_hash?: string;
+  audit_log: { ts: number; step: string; ok: boolean }[];
+  error?: string | null;
+  elapsed_seconds: number;
+};
+
+export type FeedbackResult = {
+  mode: "dry_run" | "live" | "error" | "skipped";
+  agent_id: number;
+  score: number;
+  score_raw: number;
+  tags: { tag1: string; tag2: string };
+  tx_hash?: string | null;
+  block_number?: number | null;
+  status?: number | null;
+  gas_used?: number | null;
+  receipt_error?: string | null;
+  tx?: Record<string, unknown> | null;
+  calldata?: string | null;
+  elapsed_seconds: number;
+  error?: string | null;
+};
+
+export type CompleteHireResult = {
+  hire: HireResult;
+  settlement: SettlementResult | null;
+  feedback: FeedbackResult | { mode: "skipped"; reason: string } | null;
+  overall_status: "ok" | "delivery_failed" | "settlement_failed" | "feedback_failed" | "unknown";
+  error?: string | null;
+};
+
 async function jget<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
@@ -193,4 +294,61 @@ export const api = {
   axlTopology: (apiPort: number) => jget<AxlTopology>(`/api/axl/topology?api_port=${apiPort}`),
   axlSendJob: (body: { a_port?: number; b_port?: number; task?: string; input: string; timeout?: number }) =>
     jget<AxlSendJobResult>("/api/axl/send-job", { method: "POST", body: JSON.stringify(body) }),
+  axlAgentCard: (peer: string, apiPort = 9002) =>
+    jget<AxlAgentCard>(`/api/axl/agent-card?peer=${peer}&api_port=${apiPort}`),
+  axlA2A: (body: {
+    peer: string;
+    service?: string;
+    input?: string;
+    inner_request?: Record<string, unknown>;
+    api_port?: number;
+    timeout?: number;
+  }) =>
+    jget<AxlA2AResult>("/api/axl/a2a", { method: "POST", body: JSON.stringify(body) }),
+  hire: (body: {
+    capability?: string;
+    service?: string;
+    input?: string;
+    inner_request?: Record<string, unknown>;
+    candidates?: Record<string, unknown>[];
+    extra_candidates?: SyntheticCandidate[];
+    a2a_timeout?: number;
+    max_attempts?: number;
+    budget?: number;
+    min_reputation?: number;
+    require_feedback?: boolean;
+    limit?: number;
+    api_port?: number;
+  }) => jget<HireResult>("/api/hire", { method: "POST", body: JSON.stringify(body) }),
+
+  // Phase 5
+  settlementStatus: () => jget<SettlementStatus>("/api/settlement/status"),
+  settle: (body: { agent_wallet: string; amount_usdc?: number; force_stub?: boolean }) =>
+    jget<SettlementResult>("/api/settle", { method: "POST", body: JSON.stringify(body) }),
+  writeFeedback: (body: {
+    agent_id: number;
+    score?: number;
+    tags?: string[];
+    endpoint?: string;
+    feedback_uri?: string;
+    feedback_payload?: Record<string, unknown>;
+  }) => jget<FeedbackResult>("/api/write-feedback", { method: "POST", body: JSON.stringify(body) }),
+  completeHire: (body: {
+    capability?: string;
+    service?: string;
+    input?: string;
+    inner_request?: Record<string, unknown>;
+    candidates?: Record<string, unknown>[];
+    extra_candidates?: SyntheticCandidate[];
+    a2a_timeout?: number;
+    max_attempts?: number;
+    payment_amount_usdc?: number;
+    feedback_score?: number;
+    feedback_tags?: string[];
+    feedback_endpoint?: string;
+    write_feedback_onchain?: boolean;
+    force_stub_settlement?: boolean;
+    api_port?: number;
+  }) =>
+    jget<CompleteHireResult>("/api/complete-hire", { method: "POST", body: JSON.stringify(body) }),
 };
