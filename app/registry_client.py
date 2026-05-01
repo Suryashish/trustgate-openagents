@@ -42,6 +42,7 @@ from config import (
     BASE_RPC_URL,
     IDENTITY_REGISTRY_ADDRESS,
     IPFS_GATEWAYS,
+    REPUTATION_REGISTRY_ADDRESS,
     TRUSTGATE_CACHE_DIR,
 )
 
@@ -143,6 +144,7 @@ class RegistryClient:
         self,
         rpc_url: str = BASE_RPC_URL,
         identity_address: str = IDENTITY_REGISTRY_ADDRESS,
+        reputation_address: str = REPUTATION_REGISTRY_ADDRESS,
         cache_dir: str = TRUSTGATE_CACHE_DIR,
         scan_chunk: int = 5000,
         ipfs_gateways: Iterable[str] = IPFS_GATEWAYS,
@@ -152,6 +154,9 @@ class RegistryClient:
         self.identity_address = Web3.to_checksum_address(identity_address)
         self.identity_abi = _load_abi("IdentityRegistry")
         self.identity = self.w3.eth.contract(address=self.identity_address, abi=self.identity_abi)
+        self.reputation_address = Web3.to_checksum_address(reputation_address)
+        self.reputation_abi = _load_abi("ReputationRegistry")
+        self.reputation = self.w3.eth.contract(address=self.reputation_address, abi=self.reputation_abi)
         self.chain_id = self.w3.eth.chain_id
         self.cache_dir = cache_dir
         self.scan_chunk = scan_chunk
@@ -201,6 +206,96 @@ class RegistryClient:
 
     def owner_of(self, agent_id: int) -> str:
         return self.identity.functions.ownerOf(agent_id).call()
+
+    # ----- reputation reads ------------------------------------------------
+    #
+    # ReputationRegistry on Base Sepolia stores feedback as int128 scores in
+    # the range [-100, 100]. We map that to [0, 1] for the scorer with
+    # `(score + 100) / 200`. The contract's getSummary(empty_tag, ...) returns
+    # an aggregate that doesn't correspond to a simple mean; for ranking we
+    # compute the active-mean ourselves from readAllFeedback (which is one RPC
+    # call regardless of feedback count, since the contract returns parallel
+    # arrays).
+    SCORE_MIN = -100
+    SCORE_MAX = 100
+
+    @classmethod
+    def _normalise_score(cls, raw: float) -> float:
+        return max(0.0, min(1.0, (raw - cls.SCORE_MIN) / (cls.SCORE_MAX - cls.SCORE_MIN)))
+
+    def get_clients(self, agent_id: int) -> list[str]:
+        try:
+            return list(self.reputation.functions.getClients(agent_id).call())
+        except Exception:
+            return []
+
+    def _read_all_feedback(self, agent_id: int, clients: list[str]) -> tuple[list, list, list, list, list, list, list]:
+        """Returns (clients, indices, scores, trust_levels, tags1, tags2, revoked)."""
+        if not clients:
+            return [], [], [], [], [], [], []
+        try:
+            return self.reputation.functions.readAllFeedback(
+                agent_id, clients, "", "", False
+            ).call()
+        except Exception:
+            return [], [], [], [], [], [], []
+
+    def get_reputation(self, agent_id: int, *, tag: str = "") -> dict:
+        """Return an aggregated reputation summary for one agent.
+
+        Computes the mean of non-revoked feedback scores client-side. If `tag`
+        is supplied, only entries with `tag1 == tag` count.
+        """
+        clients = self.get_clients(agent_id)
+        if not clients:
+            return {
+                "agent_id": agent_id, "clients": [], "count": 0,
+                "average_raw": 0, "score": 0.0, "trust_level": 0,
+            }
+        cls, indices, scores, trust_levels, tags1, tags2, revoked = self._read_all_feedback(agent_id, clients)
+        active: list[int] = []
+        active_trust: list[int] = []
+        for i in range(len(scores)):
+            if revoked[i]:
+                continue
+            if tag and tags1[i] != tag:
+                continue
+            active.append(int(scores[i]))
+            active_trust.append(int(trust_levels[i]))
+        if not active:
+            return {
+                "agent_id": agent_id, "clients": clients, "count": 0,
+                "average_raw": 0, "score": 0.0, "trust_level": 0,
+            }
+        avg_raw = sum(active) / len(active)
+        avg_trust = sum(active_trust) / len(active_trust)
+        return {
+            "agent_id": agent_id,
+            "clients": clients,
+            "count": len(active),
+            "average_raw": avg_raw,
+            "score": self._normalise_score(avg_raw),
+            "trust_level": avg_trust,
+        }
+
+    def get_recent_feedback(self, agent_id: int, *, limit: int = 10) -> list[dict]:
+        """Pull individual feedback rows for display purposes."""
+        clients = self.get_clients(agent_id)
+        cls, indices, scores, trust_levels, tags1, tags2, revoked = self._read_all_feedback(agent_id, clients)
+        rows = []
+        for i in range(len(cls)):
+            rows.append({
+                "client": cls[i],
+                "index": int(indices[i]),
+                "score_raw": int(scores[i]),
+                "score": (scores[i] - self.SCORE_MIN) / (self.SCORE_MAX - self.SCORE_MIN),
+                "trust_level": int(trust_levels[i]),
+                "tag": tags1[i],
+                "tag2": tags2[i],
+                "revoked": bool(revoked[i]),
+            })
+        rows.sort(key=lambda r: r["index"], reverse=True)
+        return rows[:limit]
 
     # ----- deploy-block discovery -----------------------------------------
 
@@ -409,5 +504,4 @@ def query_agents(capability: str, **kw) -> list[dict]:
 
 
 def get_reputation(agent_id: int) -> dict:
-    """Stub kept for main.py — Phase 3 implements the real read."""
-    return {"score": 0.0, "count": 0}
+    return _client().get_reputation(agent_id)

@@ -1,0 +1,321 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { api, type Agent, type FeedbackRow, type Reputation } from "@/lib/api";
+
+function shortAddr(a: string) {
+  return a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "";
+}
+
+function CapPill({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-zinc-300">
+      {children}
+    </span>
+  );
+}
+
+function AgentRow({
+  a,
+  onSelect,
+  selected,
+}: {
+  a: Agent;
+  onSelect: (id: number) => void;
+  selected: boolean;
+}) {
+  return (
+    <li
+      onClick={() => onSelect(a.agent_id)}
+      className={
+        "cursor-pointer rounded border p-3 text-sm transition " +
+        (selected
+          ? "border-emerald-500/40 bg-emerald-500/5"
+          : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-700")
+      }
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="font-medium">
+          <span className="text-zinc-500">#{a.agent_id}</span>{" "}
+          <span>{a.name || "(no name)"}</span>
+        </div>
+        <span className="font-mono text-[10px] text-zinc-500">{shortAddr(a.owner)}</span>
+      </div>
+      <div className="mt-1 flex flex-wrap gap-1">
+        {a.capabilities.slice(0, 6).map((c) => (
+          <CapPill key={c}>{c}</CapPill>
+        ))}
+        {a.capabilities.length > 6 && (
+          <span className="text-[10px] text-zinc-500">+{a.capabilities.length - 6}</span>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function AgentDetail({ id }: { id: number }) {
+  type Detail = Awaited<ReturnType<typeof api.agent>> & {
+    feedback?: FeedbackRow[];
+  };
+  const [d, setD] = useState<Detail | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    setErr(null);
+    setD(null);
+    Promise.all([api.agent(id), api.feedback(id, 20).catch(() => ({ rows: [] as FeedbackRow[] }))])
+      .then(([detail, fb]) => setD({ ...detail, feedback: fb.rows }))
+      .catch((e) => setErr(`${e.message || e}`))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) return <div className="text-sm text-zinc-500">Loading agent #{id}…</div>;
+  if (err) return <div className="text-sm text-rose-300">{err}</div>;
+  if (!d) return null;
+
+  const card = d.card;
+  const rep: Reputation = d.reputation;
+
+  return (
+    <div className="space-y-5 text-sm">
+      <div>
+        <div className="text-xs uppercase tracking-wider text-zinc-500">Agent #{d.agent_id}</div>
+        <div className="text-xl font-semibold">{card?.name || "(no name)"}</div>
+        {card?.description && (
+          <p className="mt-1 max-w-3xl text-zinc-300">{String(card.description)}</p>
+        )}
+      </div>
+
+      <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
+        <h3 className="mb-2 text-xs uppercase tracking-wider text-zinc-500">Reputation</h3>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div>
+            <div className="text-[10px] text-zinc-500">Score (0..1)</div>
+            <div className="text-lg tabular-nums">{rep.score.toFixed(3)}</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-zinc-500">Avg raw</div>
+            <div className="text-lg tabular-nums">{rep.average_raw.toFixed(1)}</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-zinc-500">Active feedback</div>
+            <div className="text-lg tabular-nums">{rep.count}</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-zinc-500">Avg trust</div>
+            <div className="text-lg tabular-nums">{rep.trust_level.toFixed(2)}</div>
+          </div>
+        </div>
+        {d.feedback && d.feedback.length > 0 && (
+          <div className="mt-4 max-h-72 overflow-auto rounded border border-zinc-800">
+            <table className="min-w-full text-xs">
+              <thead className="bg-zinc-900 text-zinc-500">
+                <tr>
+                  <th className="px-2 py-1.5 text-left">idx</th>
+                  <th className="px-2 py-1.5 text-left">client</th>
+                  <th className="px-2 py-1.5 text-left">score</th>
+                  <th className="px-2 py-1.5 text-left">trust</th>
+                  <th className="px-2 py-1.5 text-left">tag</th>
+                  <th className="px-2 py-1.5 text-left">tag2</th>
+                </tr>
+              </thead>
+              <tbody>
+                {d.feedback.map((r) => (
+                  <tr
+                    key={`${r.client}-${r.index}`}
+                    className={r.revoked ? "text-zinc-600 line-through" : "text-zinc-300"}
+                  >
+                    <td className="px-2 py-1 tabular-nums">{r.index}</td>
+                    <td className="px-2 py-1 font-mono">{shortAddr(r.client)}</td>
+                    <td className="px-2 py-1 tabular-nums">{r.score_raw}</td>
+                    <td className="px-2 py-1 tabular-nums">{r.trust_level}</td>
+                    <td className="px-2 py-1">{r.tag}</td>
+                    <td className="px-2 py-1">{r.tag2}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
+        <h3 className="mb-2 text-xs uppercase tracking-wider text-zinc-500">Capabilities</h3>
+        <div className="flex flex-wrap gap-1">
+          {(card?.endpoints || [])
+            .flatMap((ep) =>
+              [...(ep.skills || []), ...(ep.capabilities || []), ...(ep.domains || [])].map((c) => c.toLowerCase())
+            )
+            .filter((v, i, arr) => arr.indexOf(v) === i)
+            .map((c) => (
+              <CapPill key={c}>{c}</CapPill>
+            ))}
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
+        <h3 className="mb-2 text-xs uppercase tracking-wider text-zinc-500">Endpoints</h3>
+        {(card?.endpoints || []).length === 0 ? (
+          <p className="text-zinc-500">none advertised</p>
+        ) : (
+          <ul className="space-y-2">
+            {(card?.endpoints || []).map((ep, i) => (
+              <li key={i} className="rounded border border-zinc-800 bg-zinc-950/40 p-2 text-xs">
+                <div className="text-emerald-300">{ep.name}</div>
+                <div className="break-all font-mono text-zinc-300">{ep.endpoint}</div>
+                {ep.version && <div className="text-zinc-500">v{ep.version}</div>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
+        <h3 className="mb-2 text-xs uppercase tracking-wider text-zinc-500">On-chain provenance</h3>
+        <dl className="grid grid-cols-1 gap-1 text-xs sm:grid-cols-2">
+          <div>
+            <dt className="text-zinc-500">Owner</dt>
+            <dd className="font-mono">{d.owner}</dd>
+          </div>
+          <div>
+            <dt className="text-zinc-500">Block</dt>
+            <dd className="tabular-nums">{d.block.toLocaleString()}</dd>
+          </div>
+          <div className="sm:col-span-2">
+            <dt className="text-zinc-500">tx</dt>
+            <dd className="break-all font-mono">{d.tx_hash}</dd>
+          </div>
+          <div className="sm:col-span-2">
+            <dt className="text-zinc-500">agentURI (registered)</dt>
+            <dd className="break-all font-mono text-zinc-400">
+              {d.agent_uri.length > 200 ? `${d.agent_uri.slice(0, 200)}…` : d.agent_uri}
+            </dd>
+          </div>
+          {d.live_token_uri && d.live_token_uri !== d.agent_uri && (
+            <div className="sm:col-span-2">
+              <dt className="text-amber-400">live tokenURI (current — drifted)</dt>
+              <dd className="break-all font-mono text-amber-200/80">
+                {d.live_token_uri.length > 200 ? `${d.live_token_uri.slice(0, 200)}…` : d.live_token_uri}
+              </dd>
+            </div>
+          )}
+        </dl>
+      </section>
+    </div>
+  );
+}
+
+export function AgentsTab() {
+  const [capability, setCapability] = useState("");
+  const [pendingCap, setPendingCap] = useState("");
+  const [activeOnly, setActiveOnly] = useState(true);
+  const [reloadTick, setReloadTick] = useState(0);
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [selected, setSelected] = useState<number | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    setErr(null);
+    api
+      .agents({ capability: capability || undefined, active: activeOnly, limit: 50 })
+      .then((r) => {
+        setAgents(r.agents);
+        // re-select first agent whenever the list changes; if the previously
+        // selected one is gone, drop the selection
+        if (r.agents.length === 0) {
+          setSelected(null);
+          return;
+        }
+        setSelected((prev) =>
+          prev != null && r.agents.some((a) => a.agent_id === prev) ? prev : r.agents[0].agent_id
+        );
+      })
+      .catch((e) => setErr(`${e.message || e}`))
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [capability, activeOnly, reloadTick]);
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
+      <div className="space-y-3">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const next = pendingCap.trim().toLowerCase();
+            if (next === capability) {
+              // same value — bump the reload tick so the user gets a re-fetch
+              setReloadTick((t) => t + 1);
+            } else {
+              setCapability(next);
+            }
+          }}
+          className="flex gap-2"
+        >
+          <input
+            value={pendingCap}
+            onChange={(e) => setPendingCap(e.target.value)}
+            placeholder="filter capability — e.g. swap"
+            className="flex-1 rounded border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm placeholder-zinc-600 focus:border-emerald-500 focus:outline-none"
+          />
+          <button
+            type="submit"
+            className="rounded bg-emerald-500/20 px-3 py-1.5 text-sm text-emerald-200 ring-1 ring-emerald-400/30 hover:bg-emerald-500/30"
+          >
+            Filter
+          </button>
+          {capability && (
+            <button
+              type="button"
+              onClick={() => {
+                setPendingCap("");
+                setCapability("");
+              }}
+              className="rounded bg-zinc-800 px-2 py-1.5 text-xs text-zinc-400 hover:text-zinc-200"
+              title="Clear capability filter"
+            >
+              Clear
+            </button>
+          )}
+        </form>
+        <label className="flex items-center gap-2 text-xs text-zinc-400">
+          <input
+            type="checkbox"
+            checked={activeOnly}
+            onChange={(e) => setActiveOnly(e.target.checked)}
+            className="accent-emerald-500"
+          />
+          active only
+        </label>
+
+        {loading && <div className="text-sm text-zinc-500">Loading…</div>}
+        {err && <div className="text-sm text-rose-300">{err}</div>}
+
+        <ul className="max-h-[70vh] space-y-2 overflow-auto pr-1">
+          {agents.map((a) => (
+            <AgentRow
+              key={a.agent_id}
+              a={a}
+              onSelect={setSelected}
+              selected={selected === a.agent_id}
+            />
+          ))}
+          {!loading && agents.length === 0 && (
+            <li className="text-sm text-zinc-500">No agents matched.</li>
+          )}
+        </ul>
+      </div>
+
+      <div className="rounded-lg border border-zinc-800 bg-zinc-900/20 p-4">
+        {selected != null ? (
+          <AgentDetail id={selected} />
+        ) : (
+          <div className="text-sm text-zinc-500">Select an agent to inspect.</div>
+        )}
+      </div>
+    </div>
+  );
+}
