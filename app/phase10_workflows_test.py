@@ -1,7 +1,10 @@
-"""Phase 10 — persona workflow integration test.
+"""Phase 10/11 — persona workflow integration test.
 
 Walks each of the four user personas through the workflow they actually use,
-end-to-end against a running stack. Run after `bash scripts/run.sh`:
+end-to-end against a running stack. Phase 11 added: capability autocomplete
+endpoint check, owner_ens field check, Self-tab update-card dry-run.
+
+Run after `bash scripts/run.sh`:
 
     PYTHONPATH=app .venv/bin/python -u app/phase10_workflows_test.py
 
@@ -76,8 +79,15 @@ def workflow_browser() -> bool:
         ok(f"GET /api/agents?limit=5 → {len(agents['agents'])} hydrated rows")
         if agents["agents"]:
             sample_id = agents["agents"][0]["agent_id"]
+            # Confirm the Phase 10 owner_ens field shape exists (value can be
+            # null — we just verify it's there so the dashboard never reads
+            # `undefined`).
+            sample_row = agents["agents"][0]
+            if "owner_ens" not in sample_row:
+                fail("agent payload missing owner_ens field (Phase 10 contract)")
+                return False
             detail = jget(f"{API}/api/agents/{sample_id}?ens=0")
-            ok(f"GET /api/agents/{sample_id} → owner {detail['owner'][:10]}…")
+            ok(f"GET /api/agents/{sample_id} → owner {detail['owner'][:10]}… owner_ens={detail.get('owner_ens')}")
         caps = jget(f"{API}/api/capabilities")
         ok(f"GET /api/capabilities → {caps['total']} unique capabilities (autocomplete fuel)")
         return True
@@ -270,6 +280,33 @@ def workflow_operator() -> bool:
         wf = (out.get("settlement") or {}).get("workflow_id")
         ok(f"POST /api/complete-hire → ok | winner=worker-{'b' if winner == 0 else 'c'} | reply={reply}")
         ok(f"  settlement workflow {wf}")
+
+        # Phase 11: setAgentURI dry-run path. Use whichever id the operator
+        # already owns (Phase 7 left us as agent #5412 on Sepolia). Skip
+        # gracefully if owned_agent_ids is empty — running this test against
+        # a fresh wallet shouldn't fail just because no Self-register has
+        # happened yet.
+        self_status = jget(f"{API}/api/self/status")
+        owned = self_status.get("owned_agent_ids") or []
+        if owned:
+            target = owned[0]
+            upd = jget(
+                f"{API}/api/self/update-card",
+                body={"agent_id": target, "axl_pubkey": bpk, "dry_run": True},
+            )
+            if upd.get("mode") != "dry_run":
+                fail(f"update-card dry-run returned wrong mode: {upd.get('mode')}")
+                return False
+            cd = upd.get("calldata", "")
+            # setAgentURI(uint256, string) selector
+            from eth_utils import keccak  # type: ignore
+            expected = "0x" + keccak(b"setAgentURI(uint256,string)")[:4].hex()
+            if not cd.startswith(expected):
+                fail(f"setAgentURI calldata selector wrong: {cd[:14]} (expected {expected})")
+                return False
+            ok(f"POST /api/self/update-card (dry-run) → calldata starts {cd[:14]} (selector matches setAgentURI)")
+        else:
+            print("  · skipping update-card check (signer owns no agents on this network)")
         return True
     except Exception as e:
         fail(f"operator workflow: {type(e).__name__}: {e}")

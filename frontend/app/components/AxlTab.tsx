@@ -8,6 +8,7 @@ import {
   type AxlTopology,
   type HireResult,
 } from "@/lib/api";
+import { Tooltip } from "./Tooltip";
 
 function shortPk(pk: string) {
   return pk ? `${pk.slice(0, 16)}…${pk.slice(-6)}` : "";
@@ -195,8 +196,49 @@ export function AxlTab() {
     }
   }
 
+  // Friendly mesh diagram: three dots, lines from n1 to each worker. Live
+  // dots when topology fetched, grey when not. Skips when nothing's loaded.
+  const meshReady = !!(topoA?.topology && topoB?.topology && topoC?.topology);
+
   return (
     <div className="space-y-6">
+      <section className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-sm font-medium text-zinc-300">
+              What you&apos;re looking at:{" "}
+              <Tooltip text="Gensyn AXL is a peer-to-peer mesh between agent nodes. The Go binary speaks TLS over a virtual gVisor network and exposes a localhost HTTP bridge per node. TrustGate routes every job over this mesh — there is no central coordinator.">
+                AXL
+              </Tooltip>{" "}
+              mesh
+            </h3>
+            <p className="mt-1 text-xs text-zinc-500">
+              n1 is TrustGate (sender). n2 + n3 host the workers. Job traffic crosses the mesh
+              from n1 → worker; results come back the same way.
+            </p>
+          </div>
+          {/* tiny SVG mesh diagram — three nodes, two lines */}
+          <svg viewBox="0 0 220 80" className="h-16 shrink-0">
+            {/* lines */}
+            <line x1="40" y1="40" x2="110" y2="40" stroke={meshReady ? "#34d399" : "#52525b"} strokeWidth="1.5" />
+            <line x1="40" y1="40" x2="180" y2="40" stroke={meshReady ? "#34d399" : "#52525b"} strokeWidth="1.5" />
+            {/* nodes */}
+            <g>
+              <circle cx="40" cy="40" r="10" fill={topoA?.topology ? "#10b981" : "#52525b"} />
+              <text x="40" y="68" textAnchor="middle" className="fill-zinc-400" fontSize="10">n1</text>
+            </g>
+            <g>
+              <circle cx="110" cy="40" r="8" fill={topoB?.topology ? "#10b981" : "#52525b"} />
+              <text x="110" y="68" textAnchor="middle" className="fill-zinc-400" fontSize="10">n2</text>
+            </g>
+            <g>
+              <circle cx="180" cy="40" r="8" fill={topoC?.topology ? "#10b981" : "#52525b"} />
+              <text x="180" y="68" textAnchor="middle" className="fill-zinc-400" fontSize="10">n3</text>
+            </g>
+          </svg>
+        </div>
+      </section>
+
       <section>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-medium text-zinc-400">Local AXL nodes</h2>

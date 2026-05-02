@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { api, type FindBestResult, type ScoredCandidate } from "@/lib/api";
+import { Tooltip } from "./Tooltip";
 
 // Pinned shortcut chips. The full typeahead is populated from the live
 // /api/capabilities endpoint, but having a few fixed pivots avoids the
@@ -299,7 +300,11 @@ export function HireTab() {
           {running ? "Ranking…" : "Find best agent"}
         </button>
         <p className="text-[11px] text-zinc-500">
-          Score = 0.60 × reputation + 0.20 × price_score + 0.20 × latency_score. Over-budget candidates are dropped before scoring.
+          Score ={" "}
+          <Tooltip text="0.60 × reputation + 0.20 × price + 0.20 × latency. Tunable per-call via the form fields above; weights default to TrustGate's blueprint values.">
+            0.60·rep + 0.20·price + 0.20·latency
+          </Tooltip>
+          . Over-budget candidates are dropped before scoring.
         </p>
       </form>
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api, type CacheStatus, type CompleteHireResult, type NetworkInfo } from "@/lib/api";
 import { addressUrl } from "@/lib/links";
 import { SetupWizard } from "./SetupWizard";
+import { Tooltip } from "./Tooltip";
 
 function Stat({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
   return (
@@ -304,27 +305,62 @@ export function OverviewTab({
             <li>
               <span className="mr-2 text-emerald-400">1.</span>
               <span className="font-medium">Broadcast</span>
-              <span className="text-zinc-500"> · Agent A sends a job spec over AXL</span>
+              <span className="text-zinc-500">
+                {" "}· Agent A sends a job spec over{" "}
+                <Tooltip text="Gensyn AXL — encrypted P2P mesh between agent nodes. No coordinator server.">
+                  AXL
+                </Tooltip>
+              </span>
             </li>
             <li>
               <span className="mr-2 text-emerald-400">2.</span>
               <span className="font-medium">Discover</span>
-              <span className="text-zinc-500"> · Identity Registry → candidates by capability</span>
+              <span className="text-zinc-500">
+                {" "}·{" "}
+                <Tooltip text="ERC-8004 Identity Registry. Each agent is an ERC-721 NFT whose tokenURI points at a JSON card listing capabilities + endpoints.">
+                  Identity Registry
+                </Tooltip>
+                {" "}→ candidates by capability
+              </span>
             </li>
             <li>
               <span className="mr-2 text-emerald-400">3.</span>
               <span className="font-medium">Evaluate</span>
-              <span className="text-zinc-500"> · Reputation Registry → ranked list (60/20/20)</span>
+              <span className="text-zinc-500">
+                {" "}·{" "}
+                <Tooltip text="ERC-8004 Reputation Registry stores int128 scores in [-100, 100]. We normalize to [0,1] and average non-revoked entries client-side.">
+                  Reputation Registry
+                </Tooltip>
+                {" "}→ ranked list (
+                <Tooltip text="0.60 × reputation + 0.20 × price + 0.20 × latency">60/20/20</Tooltip>
+                )
+              </span>
             </li>
             <li>
               <span className="mr-2 text-emerald-400">4.</span>
               <span className="font-medium">Hire &amp; deliver</span>
-              <span className="text-zinc-500"> · AXL A2A SendMessage + retry/fallback to runner-up</span>
+              <span className="text-zinc-500">
+                {" "}· AXL{" "}
+                <Tooltip text="Agent-to-Agent JSON-RPC envelope. Forwarded over the AXL mesh; the receiver implements /.well-known/agent-card.json + a SendMessage POST handler.">
+                  A2A SendMessage
+                </Tooltip>
+                {" "}+ retry/fallback to runner-up
+              </span>
             </li>
             <li>
               <span className="mr-2 text-emerald-400">5.</span>
               <span className="font-medium">Settle &amp; record</span>
-              <span className="text-zinc-500"> · KeeperHub workflow + giveFeedback onchain</span>
+              <span className="text-zinc-500">
+                {" "}·{" "}
+                <Tooltip text="KeeperHub orchestrates onchain payment workflows with retry + idempotency. Stub mode produces a deterministic audit trail for demos without a paid account.">
+                  KeeperHub
+                </Tooltip>
+                {" "}workflow +{" "}
+                <Tooltip text="ReputationRegistry.giveFeedback(agentId, score, valueDecimals, tag1, tag2, endpoint, feedbackURI, feedbackHash). Permissionless but each (client, agent) pair has its own append-only log.">
+                  giveFeedback
+                </Tooltip>
+                {" "}onchain
+              </span>
             </li>
           </ol>
         </div>

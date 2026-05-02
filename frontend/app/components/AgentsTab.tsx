@@ -16,22 +16,27 @@ function AgentRow({
   a,
   onSelect,
   selected,
+  comparePinned,
   network,
 }: {
   a: Agent;
-  onSelect: (id: number) => void;
+  onSelect: (id: number, opts: { compare: boolean }) => void;
   selected: boolean;
+  comparePinned: boolean;
   network: NetworkInfo | null;
 }) {
   return (
     <li
-      onClick={() => onSelect(a.agent_id)}
+      onClick={(e) => onSelect(a.agent_id, { compare: e.shiftKey || e.metaKey || e.ctrlKey })}
       className={
         "cursor-pointer rounded border p-3 text-sm transition " +
         (selected
           ? "border-emerald-500/40 bg-emerald-500/5"
-          : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-700")
+          : comparePinned
+            ? "border-sky-500/40 bg-sky-500/5"
+            : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-700")
       }
+      title={comparePinned ? "pinned for compare" : "click to inspect · shift-click to compare"}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="font-medium">
@@ -133,6 +138,41 @@ function AgentDetail({ id, network }: { id: number; network: NetworkInfo | null 
             <div className="text-lg tabular-nums">{rep.trust_level.toFixed(2)}</div>
           </div>
         </div>
+        {d.feedback && d.feedback.length > 0 && (
+          <div className="mt-4">
+            <div className="mb-1 flex items-center justify-between text-[10px] text-zinc-500">
+              <span>feedback timeline (oldest → newest)</span>
+              <span>
+                <span className="mr-2 inline-block h-1.5 w-3 rounded-sm bg-emerald-400/80 align-middle"></span>positive ·{" "}
+                <span className="mr-2 inline-block h-1.5 w-3 rounded-sm bg-rose-400/80 align-middle"></span>negative
+              </span>
+            </div>
+            <div className="flex h-12 items-end gap-0.5 overflow-x-auto rounded border border-zinc-800 bg-zinc-950/60 p-1">
+              {[...d.feedback]
+                .sort((a, b) => a.index - b.index)
+                .map((r) => {
+                  // height proportional to abs(score) on [0..1] scale
+                  const h = Math.max(6, Math.round(Math.abs(r.score - 0.5) * 2 * 38));
+                  const positive = r.score >= 0.5;
+                  return (
+                    <div
+                      key={`${r.client}-${r.index}`}
+                      className={
+                        "shrink-0 w-2 rounded-sm transition-opacity " +
+                        (r.revoked
+                          ? "bg-zinc-700 opacity-50"
+                          : positive
+                            ? "bg-emerald-400/80 hover:bg-emerald-300"
+                            : "bg-rose-400/80 hover:bg-rose-300")
+                      }
+                      style={{ height: `${h}px` }}
+                      title={`#${r.index} · score ${r.score.toFixed(2)} (raw ${r.score_raw}) · ${r.tag || "(no tag)"}${r.revoked ? " · revoked" : ""}`}
+                    />
+                  );
+                })}
+            </div>
+          </div>
+        )}
         {d.feedback && d.feedback.length > 0 && (
           <div className="mt-4 max-h-72 overflow-auto rounded border border-zinc-800">
             <table className="min-w-full text-xs">
@@ -275,6 +315,25 @@ export function AgentsTab({ network }: { network: NetworkInfo | null }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
+  const [compareWith, setCompareWith] = useState<number | null>(null);
+
+  // Phase 11: top-N capability discovery pills above the filter input.
+  // Lets a browser pivot from "I have no idea what to search" to a one-click
+  // jump into a popular slice of the registry.
+  const [topCaps, setTopCaps] = useState<{ capability: string; count: number }[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .capabilities()
+      .then((r) => {
+        if (cancelled) return;
+        setTopCaps(r.capabilities.slice(0, 8));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -301,6 +360,35 @@ export function AgentsTab({ network }: { network: NetworkInfo | null }) {
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
       <div className="space-y-3">
+        {topCaps.length > 0 && (
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-3">
+            <div className="mb-2 text-[10px] uppercase tracking-wider text-zinc-500">
+              Browse by capability
+            </div>
+            <div className="flex flex-wrap gap-1.5 text-[11px]">
+              {topCaps.map((c) => (
+                <button
+                  key={c.capability}
+                  type="button"
+                  onClick={() => {
+                    setPendingCap(c.capability);
+                    setCapability(c.capability);
+                  }}
+                  className={
+                    "rounded px-2 py-0.5 transition " +
+                    (c.capability === capability
+                      ? "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-400/30"
+                      : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700")
+                  }
+                  title={`${c.count} agents advertise ${c.capability}`}
+                >
+                  {c.capability.length > 26 ? `${c.capability.slice(0, 26)}…` : c.capability}
+                  <span className="ml-1 text-[10px] text-zinc-500">·{c.count}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -358,8 +446,21 @@ export function AgentsTab({ network }: { network: NetworkInfo | null }) {
             <AgentRow
               key={a.agent_id}
               a={a}
-              onSelect={setSelected}
+              onSelect={(id, opts) => {
+                if (opts.compare) {
+                  // shift / cmd / ctrl click → toggle as the compare slot.
+                  // Toggle off if it's already pinned; ignore if it equals the
+                  // primary selection (no point comparing an agent to itself).
+                  if (id === selected) return;
+                  setCompareWith((cur) => (cur === id ? null : id));
+                } else {
+                  setSelected(id);
+                  // If the new primary equals the compare pin, clear the pin.
+                  setCompareWith((cur) => (cur === id ? null : cur));
+                }
+              }}
               selected={selected === a.agent_id}
+              comparePinned={compareWith === a.agent_id}
               network={network}
             />
           ))}
@@ -369,11 +470,35 @@ export function AgentsTab({ network }: { network: NetworkInfo | null }) {
         </ul>
       </div>
 
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/20 p-4">
+      <div
+        className={
+          compareWith != null
+            ? "grid gap-3 rounded-lg border border-zinc-800 bg-zinc-900/20 p-4 lg:grid-cols-2"
+            : "rounded-lg border border-zinc-800 bg-zinc-900/20 p-4"
+        }
+      >
         {selected != null ? (
-          <AgentDetail id={selected} network={network} />
+          <div className={compareWith != null ? "border-r border-zinc-800 pr-3 lg:pr-4" : ""}>
+            <AgentDetail id={selected} network={network} />
+          </div>
         ) : (
-          <div className="text-sm text-zinc-500">Select an agent to inspect.</div>
+          <div className="text-sm text-zinc-500">
+            Click an agent to inspect. <span className="text-zinc-600">Shift-click a second agent to compare side-by-side.</span>
+          </div>
+        )}
+        {compareWith != null && (
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-[10px] uppercase tracking-wider text-sky-300/80">comparing with</div>
+              <button
+                onClick={() => setCompareWith(null)}
+                className="rounded bg-zinc-800/60 px-2 py-0.5 text-[10px] text-zinc-400 ring-1 ring-zinc-700 hover:text-zinc-200"
+              >
+                Close
+              </button>
+            </div>
+            <AgentDetail id={compareWith} network={network} />
+          </div>
         )}
       </div>
     </div>

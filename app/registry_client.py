@@ -531,6 +531,129 @@ class RegistryClient:
                 result["receipt_error"] = f"{type(e).__name__}: {e}"
         return result
 
+    # ----- Phase 11: setAgentURI (update card without re-registering) ------
+    #
+    # `setAgentURI(uint256 agentId, string newURI)` — owner-only. Lets a
+    # registered agent update its card in place; preserves agent_id and any
+    # accumulated reputation history.
+    def build_set_agent_uri_tx(
+        self,
+        agent_id: int,
+        new_uri: str,
+        *,
+        from_address: str,
+        gas: int | None = None,
+        max_fee_per_gas: int | None = None,
+        max_priority_fee_per_gas: int | None = None,
+    ) -> dict:
+        if not new_uri:
+            raise ValueError("new_uri is required")
+        from_address = Web3.to_checksum_address(from_address)
+        fn = self.identity.functions.setAgentURI(int(agent_id), str(new_uri))
+        nonce = self.w3.eth.get_transaction_count(from_address, "pending")
+        try:
+            fees = self.w3.eth.fee_history(1, "latest")
+            base = fees["baseFeePerGas"][-1]
+            tip = self.w3.to_wei(1, "gwei")
+            mfpg = max_fee_per_gas if max_fee_per_gas is not None else int(base * 2 + tip)
+            mpfg = max_priority_fee_per_gas if max_priority_fee_per_gas is not None else tip
+        except Exception:
+            mfpg = max_fee_per_gas or self.w3.to_wei(2, "gwei")
+            mpfg = max_priority_fee_per_gas or self.w3.to_wei(1, "gwei")
+
+        if gas is None:
+            try:
+                est = fn.estimate_gas({"from": from_address})
+                gas = int(est * 1.3)
+            except Exception:
+                # Estimate reverts when the caller isn't actually the owner —
+                # fall back to a conservative ceiling so the dry-run path still
+                # produces sensible calldata.
+                gas = 600_000
+
+        return fn.build_transaction({
+            "from": from_address,
+            "nonce": nonce,
+            "gas": gas,
+            "maxFeePerGas": mfpg,
+            "maxPriorityFeePerGas": mpfg,
+            "chainId": self.chain_id,
+        })
+
+    def send_set_agent_uri(
+        self,
+        agent_id: int,
+        new_uri: str,
+        *,
+        private_key: Optional[str] = None,
+        dry_run: bool = False,
+        wait_for_receipt: bool = True,
+        receipt_timeout: float = 180.0,
+        **kwargs,
+    ) -> dict:
+        """Sign + broadcast `setAgentURI(agentId, newURI)`.
+
+        Same dry-run / live shape as `send_register`. Reverts if the caller
+        isn't the owner of `agent_id`; we surface that as `error` rather than
+        raising, so the dashboard can render it cleanly.
+        """
+        pk = "" if dry_run else (private_key or os.getenv("PRIVATE_KEY", ""))
+        if not pk:
+            tx = self.build_set_agent_uri_tx(
+                agent_id, new_uri, from_address="0x" + "0" * 40, **kwargs,
+            )
+            return {
+                "mode": "dry_run",
+                "agent_id": int(agent_id),
+                "new_uri": new_uri,
+                "tx": {k: (hex(v) if isinstance(v, int) and k != "chainId" else v) for k, v in tx.items()},
+                "calldata": tx["data"],
+                "to": tx["to"],
+                "note": "set PRIVATE_KEY in .env to sign and broadcast",
+            }
+        from eth_account import Account
+        acct = Account.from_key(pk)
+
+        # Pre-flight: only the owner can update. Surface a clear error before
+        # spending gas on a tx that's guaranteed to revert.
+        try:
+            current_owner = self.owner_of(int(agent_id))
+            if Web3.to_checksum_address(current_owner) != acct.address:
+                return {
+                    "mode": "error",
+                    "agent_id": int(agent_id),
+                    "from": acct.address,
+                    "error": (
+                        f"signer {acct.address} is not the owner of agent #{agent_id} "
+                        f"(owner is {current_owner}). setAgentURI would revert."
+                    ),
+                }
+        except Exception:
+            # If we can't read the owner (RPC flap, agent doesn't exist),
+            # let the broadcast attempt produce the canonical error.
+            pass
+
+        tx = self.build_set_agent_uri_tx(agent_id, new_uri, from_address=acct.address, **kwargs)
+        signed = acct.sign_transaction(tx)
+        tx_hash = self.w3.eth.send_raw_transaction(signed.raw_transaction)
+        result = {
+            "mode": "live",
+            "agent_id": int(agent_id),
+            "new_uri": new_uri,
+            "from": acct.address,
+            "tx_hash": tx_hash.hex(),
+            "submitted_at_block": int(self.w3.eth.block_number),
+        }
+        if wait_for_receipt:
+            try:
+                receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=receipt_timeout)
+                result["block_number"] = int(receipt.blockNumber)
+                result["status"] = int(receipt.status)
+                result["gas_used"] = int(receipt.gasUsed)
+            except Exception as e:
+                result["receipt_error"] = f"{type(e).__name__}: {e}"
+        return result
+
     def find_owned_agent_ids(self, owner: str, *, recent_block_window: int = 5000) -> list[int]:
         """Find ids registered to this owner.
 

@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, API_BASE, type SelfStatus, type SelfRegisterResult, type EnsResolveResult } from "@/lib/api";
+import {
+  api,
+  API_BASE,
+  type SelfStatus,
+  type SelfRegisterResult,
+  type SelfUpdateCardResult,
+  type EnsResolveResult,
+} from "@/lib/api";
 import { addressUrl, agentUrl, txUrl } from "@/lib/links";
 
 function ModeBadge({ live, label }: { live: boolean; label: string }) {
@@ -36,6 +43,11 @@ export function SelfTab() {
   const [registerResult, setRegisterResult] = useState<SelfRegisterResult | null>(null);
   const [registerError, setRegisterError] = useState<string | null>(null);
   const [registering, setRegistering] = useState(false);
+
+  const [updateAgentId, setUpdateAgentId] = useState<number | null>(null);
+  const [updateResult, setUpdateResult] = useState<SelfUpdateCardResult | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  const [updating, setUpdating] = useState(false);
 
   const [ensInput, setEnsInput] = useState("");
   const [ensResult, setEnsResult] = useState<EnsResolveResult | null>(null);
@@ -82,6 +94,33 @@ export function SelfTab() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Default the Update-card target to the first owned id.
+  useEffect(() => {
+    if (updateAgentId == null && status?.owned_agent_ids?.length) {
+      setUpdateAgentId(status.owned_agent_ids[0]);
+    }
+  }, [status, updateAgentId]);
+
+  const onUpdateCard = async (dryRun: boolean) => {
+    if (updateAgentId == null) return;
+    setUpdating(true);
+    setUpdateError(null);
+    setUpdateResult(null);
+    try {
+      const res = await api.selfUpdateCard({
+        agent_id: updateAgentId,
+        axl_pubkey: axlPubkey || undefined,
+        api_url: apiUrl || undefined,
+        dry_run: dryRun,
+      });
+      setUpdateResult(res);
+    } catch (e) {
+      setUpdateError((e as Error).message || String(e));
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   const onRegister = async () => {
     setRegistering(true);
@@ -339,6 +378,124 @@ export function SelfTab() {
           </div>
         )}
       </section>
+
+      {(status?.owned_agent_ids?.length ?? 0) > 0 && (
+        <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
+          <h3 className="mb-2 text-sm font-medium text-zinc-400">Update existing card · setAgentURI</h3>
+          <p className="mb-3 text-xs text-zinc-500">
+            Re-publishes the card on an agent id you already own. Reputation history is
+            preserved (vs. <code className="rounded bg-zinc-800 px-1">register</code>, which
+            mints a new id). Reverts if the signer isn&apos;t the owner — we pre-flight that
+            client-side so you don&apos;t waste gas.
+          </p>
+          <div className="grid gap-3 md:grid-cols-3">
+            <label className="block text-xs">
+              <span className="text-zinc-400">Target agent id</span>
+              <select
+                value={updateAgentId ?? ""}
+                onChange={(e) => setUpdateAgentId(Number(e.target.value))}
+                className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950/40 px-2 py-1.5 font-mono text-[12px] text-zinc-200"
+              >
+                {(status?.owned_agent_ids || []).map((id) => (
+                  <option key={id} value={id}>
+                    #{id}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-xs md:col-span-2">
+              <span className="text-zinc-400">
+                Card endpoints come from the AXL pubkey + HTTP endpoint above
+              </span>
+              <p className="mt-1 text-zinc-500">
+                Edit those fields to change what gets published. The new <code>data:</code> URI
+                is built fresh on every click.
+              </p>
+            </label>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => onUpdateCard(true)}
+              disabled={updating || updateAgentId == null}
+              className="rounded bg-zinc-800/60 px-3 py-1.5 text-sm text-zinc-300 ring-1 ring-zinc-700 hover:bg-zinc-800 disabled:opacity-50"
+            >
+              {updating ? "Submitting…" : "Preview (dry-run)"}
+            </button>
+            <button
+              onClick={() => onUpdateCard(false)}
+              disabled={updating || updateAgentId == null || !signerLive}
+              title={
+                !signerLive
+                  ? "Set PRIVATE_KEY in .env to enable broadcast"
+                  : "Sign + broadcast setAgentURI"
+              }
+              className="rounded bg-emerald-500/20 px-3 py-1.5 text-sm font-medium text-emerald-200 ring-1 ring-emerald-400/30 hover:bg-emerald-500/30 disabled:opacity-50"
+            >
+              {updating ? "Submitting…" : "Sign & broadcast"}
+            </button>
+          </div>
+          {updateError && (
+            <pre className="mt-3 whitespace-pre-wrap rounded border border-rose-900 bg-rose-950/40 p-3 text-xs text-rose-200">
+              {updateError}
+            </pre>
+          )}
+          {updateResult && (
+            <div className="mt-3 space-y-2 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-zinc-500">mode:</span>
+                <ModeBadge
+                  live={updateResult.mode === "live"}
+                  label={
+                    updateResult.mode === "live"
+                      ? "broadcast"
+                      : updateResult.mode === "error"
+                        ? "error"
+                        : "dry-run"
+                  }
+                />
+                <span className="text-zinc-500">agent #{updateResult.agent_id}</span>
+              </div>
+              {updateResult.mode === "error" && (
+                <pre className="whitespace-pre-wrap rounded border border-rose-900 bg-rose-950/40 p-3 text-rose-200">
+                  {updateResult.error}
+                </pre>
+              )}
+              {updateResult.mode === "live" && updateResult.tx_hash && (
+                <p className="text-zinc-300">
+                  tx:{" "}
+                  <a
+                    href={txUrl({ chain_id: status?.chain_id ?? 84532 }, updateResult.tx_hash)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="break-all font-mono text-emerald-300 hover:underline"
+                  >
+                    {updateResult.tx_hash}
+                  </a>
+                  {updateResult.status === 1 && (
+                    <span className="ml-2 rounded bg-emerald-500/20 px-2 py-0.5 text-emerald-200 ring-1 ring-emerald-400/30">
+                      card updated · agent #{updateResult.agent_id}
+                    </span>
+                  )}
+                </p>
+              )}
+              {updateResult.mode === "dry_run" && (
+                <>
+                  <p className="text-zinc-400">
+                    to:{" "}
+                    <code className="break-all font-mono text-emerald-300">{updateResult.to}</code>
+                  </p>
+                  <details>
+                    <summary className="cursor-pointer text-zinc-400 hover:text-zinc-200">
+                      show calldata ({updateResult.calldata?.length ?? 0} chars)
+                    </summary>
+                    <CodeBlock>{updateResult.calldata}</CodeBlock>
+                  </details>
+                </>
+              )}
+            </div>
+          )}
+        </section>
+      )}
 
       <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
         <h3 className="mb-2 text-sm font-medium text-zinc-400">ENS resolver</h3>
