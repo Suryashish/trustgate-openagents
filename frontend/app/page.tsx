@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { OverviewTab } from "./components/OverviewTab";
 import { AgentsTab } from "./components/AgentsTab";
 import { HireTab } from "./components/HireTab";
@@ -62,22 +63,29 @@ export default function Home() {
                 : "connecting…"}
             </p>
           </div>
-          <nav className="flex gap-1 rounded-lg bg-zinc-800/60 p-1 text-sm">
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={
-                  "rounded px-3 py-1.5 transition " +
-                  (tab === t.id
-                    ? "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-400/30"
-                    : "text-zinc-400 hover:text-zinc-200")
-                }
-              >
-                {t.label}
-              </button>
-            ))}
-          </nav>
+          <div className="flex items-center gap-3">
+            <nav className="flex gap-1 rounded-lg bg-zinc-800/60 p-1 text-sm">
+              {TABS.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  className={
+                    "rounded px-3 py-1.5 transition " +
+                    (tab === t.id
+                      ? "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-400/30"
+                      : "text-zinc-400 hover:text-zinc-200")
+                  }
+                >
+                  {t.label}
+                </button>
+              ))}
+            </nav>
+            <ConnectButton
+              accountStatus={{ smallScreen: "avatar", largeScreen: "full" }}
+              chainStatus="icon"
+              showBalance={false}
+            />
+          </div>
         </div>
       </header>
 

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAccount } from "wagmi";
+import { useSubmitServerTx, type SubmitState } from "@/lib/tx";
 import {
   api,
   type CompleteHireResult,
@@ -222,6 +224,46 @@ function SettlePanel({ status }: { status: SettlementStatus | null }) {
   );
 }
 
+function FeedbackWalletStatus({ state }: { state: SubmitState }) {
+  if (state.kind === "idle") return null;
+  return (
+    <div className="mt-3 rounded border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs">
+      {state.kind === "submitting" && <div className="text-amber-300">⏳ {state.reason}…</div>}
+      {state.kind === "broadcast" && (
+        <div>
+          <div className="text-emerald-300">✓ broadcast — waiting for confirmation…</div>
+          <a
+            href={txUrl(null, state.hash)}
+            target="_blank"
+            rel="noreferrer"
+            className="break-all font-mono text-emerald-300 hover:underline"
+          >
+            {state.hash}
+          </a>
+        </div>
+      )}
+      {state.kind === "confirmed" && (
+        <div>
+          <div className="text-emerald-300">
+            ✓ confirmed in block #{state.blockNumber.toString()} — feedback row written
+          </div>
+          <a
+            href={txUrl(null, state.hash)}
+            target="_blank"
+            rel="noreferrer"
+            className="break-all font-mono text-emerald-300 hover:underline"
+          >
+            {state.hash}
+          </a>
+        </div>
+      )}
+      {state.kind === "error" && (
+        <pre className="whitespace-pre-wrap text-rose-300">{state.message}</pre>
+      )}
+    </div>
+  );
+}
+
 function FeedbackPanel({ status }: { status: SettlementStatus | null }) {
   const [agentId, setAgentId] = useState(17);
   const [score, setScore] = useState(0.95);
@@ -231,11 +273,15 @@ function FeedbackPanel({ status }: { status: SettlementStatus | null }) {
   const [result, setResult] = useState<FeedbackResult | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
+  const { isConnected, address: walletAddress } = useAccount();
+  const wallet = useSubmitServerTx();
+
   async function submit(e?: React.FormEvent) {
     e?.preventDefault();
     setRunning(true);
     setErr(null);
     setResult(null);
+    wallet.reset();
     try {
       const r = await api.writeFeedback({
         agent_id: agentId,
@@ -246,8 +292,24 @@ function FeedbackPanel({ status }: { status: SettlementStatus | null }) {
           phase: 5,
           ts: new Date().toISOString(),
         },
+        // Wallet path: always force dry-run so the server returns calldata
+        // and the visitor's wallet signs + broadcasts. Operator path
+        // (PRIVATE_KEY on the server) keeps the legacy behaviour.
+        dry_run: isConnected,
       });
       setResult(r);
+      if (isConnected && r.mode === "dry_run") {
+        await wallet.submit({
+          to: r.to ?? undefined,
+          calldata: r.calldata ?? undefined,
+          tx: r.tx as Record<string, unknown> & {
+            to?: string;
+            data?: string;
+            chainId?: number;
+            gas?: string | number;
+          },
+        });
+      }
     } catch (e) {
       setErr(`${(e as Error).message || e}`);
     } finally {
@@ -306,16 +368,36 @@ function FeedbackPanel({ status }: { status: SettlementStatus | null }) {
             className="mt-1 w-full rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-sm"
           />
         </label>
-        <div className="md:col-span-4 flex justify-end">
+        <div className="md:col-span-4 flex items-center justify-end gap-3">
+          {isConnected && walletAddress && (
+            <span className="text-[11px] text-zinc-500">
+              wallet:{" "}
+              <code className="font-mono text-emerald-300">
+                {walletAddress.slice(0, 6)}…{walletAddress.slice(-4)}
+              </code>
+            </span>
+          )}
           <button
             type="submit"
-            disabled={running}
+            disabled={running || wallet.state.kind === "submitting"}
+            title={
+              isConnected
+                ? "Server returns calldata; your wallet signs and broadcasts"
+                : status?.feedback_signer.mode === "live"
+                  ? "Server signs with the operator PRIVATE_KEY"
+                  : "Returns dry-run calldata — connect a wallet (or set PRIVATE_KEY) to broadcast"
+            }
             className="rounded bg-emerald-500/20 px-3 py-1.5 text-sm text-emerald-200 ring-1 ring-emerald-400/30 hover:bg-emerald-500/30 disabled:opacity-40"
           >
-            {running ? "Writing…" : "Write feedback"}
+            {running || wallet.state.kind === "submitting"
+              ? "Writing…"
+              : isConnected
+                ? "Write with wallet"
+                : "Write feedback"}
           </button>
         </div>
       </form>
+      <FeedbackWalletStatus state={wallet.state} />
       {err && <div className="mt-3 rounded border border-rose-900 bg-rose-950/40 p-3 text-xs text-rose-200">{err}</div>}
       {result && (
         <div className="mt-3 rounded border border-zinc-800 bg-zinc-950 p-3 text-xs">

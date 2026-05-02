@@ -47,7 +47,17 @@ from ens_client import default_resolver as default_ens_resolver  # noqa: E402
 from self_registration import build_self_card, encode_self_card_uri  # noqa: E402
 
 app = Flask(__name__)
-CORS(app)
+
+# CORS: by default allow any origin (matches the local-dev experience). In
+# production set `FRONTEND_ORIGIN` to a comma-separated list of the Vercel
+# preview / production URLs to lock the API down — wagmi browser requests
+# will be rejected by the browser unless the origin matches.
+_frontend_origin = os.getenv("FRONTEND_ORIGIN", "").strip()
+if _frontend_origin:
+    _allowed = [o.strip() for o in _frontend_origin.split(",") if o.strip()]
+    CORS(app, resources={r"/api/*": {"origins": _allowed}})
+else:
+    CORS(app)
 
 
 @app.errorhandler(Exception)
@@ -557,6 +567,7 @@ def post_write_feedback():
         int(agent_id), score,
         tags=tags, endpoint=endpoint_str,
         feedback_uri=feedback_uri, feedback_payload=feedback_payload,
+        dry_run=bool(body.get("dry_run", False)),
         client=client(),
     )
     return jsonify(res.to_dict())

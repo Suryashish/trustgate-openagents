@@ -1,0 +1,36 @@
+# Anything we copy via the Dockerfile and don't want to stuff with build noise.
+.git
+.github
+.venv
+.env
+.env.local
+.env.example
+
+# Frontend builds are deployed separately on Vercel — never go into the API image.
+frontend
+node_modules
+.next
+
+# Local-only artifacts.
+logs
+*.log
+__pycache__
+**/__pycache__
+*.pyc
+
+# Dev/debug files we don't want in production.
+.vscode
+.idea
+*.swp
+.DS_Store
+
+# CI/build caches.
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.tsbuildinfo
+
+# Phase docs are reference-only; not needed at runtime.
+phase*.md
+pending.md
+TrustGate_Blueprint.md

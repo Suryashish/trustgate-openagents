@@ -1,0 +1,29 @@
+# Railway deployment config — Phase 12.
+#
+# Tells Railway to build from the Dockerfile in the repo root instead of
+# running its Nixpacks autodetect (which would try to install both Python
+# and Node and get confused by the frontend/ dir).
+#
+# Frontend is deployed separately to Vercel; this file is backend-only.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# /api/health is cheap (no chain calls) and confirms the API booted.
+healthcheckPath = "/api/health"
+healthcheckTimeout = 30
+
+# Restart on crash but don't loop forever — Railway will give up after this
+# many consecutive failures, which is what we want during initial deploy
+# debugging instead of silently consuming credits.
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
+
+# Optional: pin the region closest to the AXL deploy + your audience.
+# Railway picks one automatically when omitted; uncomment if latency matters.
+# region = "us-east"
+
+# Recommended Railway plan: Hobby ($5/mo or free trial). 512 MB RAM is
+# enough for the 3 AXL nodes + 2 workers + gunicorn (typical RSS ≈ 220 MB).

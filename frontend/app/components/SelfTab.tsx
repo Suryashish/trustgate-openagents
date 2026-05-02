@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAccount } from "wagmi";
 import {
   api,
   API_BASE,
@@ -10,6 +11,7 @@ import {
   type EnsResolveResult,
 } from "@/lib/api";
 import { addressUrl, agentUrl, txUrl } from "@/lib/links";
+import { useSubmitServerTx, type SubmitState } from "@/lib/tx";
 
 function ModeBadge({ live, label }: { live: boolean; label: string }) {
   return (
@@ -34,6 +36,61 @@ function CodeBlock({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Renders the live state of a wallet-driven tx (used for register +
+ * setAgentURI + giveFeedback). Stays empty when idle so the panel doesn't
+ * grow when no wallet path is active.
+ */
+function WalletSubmitStatus({
+  state,
+  chainId,
+  followUpLabel,
+}: {
+  state: SubmitState;
+  chainId: number;
+  followUpLabel?: string;
+}) {
+  if (state.kind === "idle") return null;
+  return (
+    <div className="mt-3 rounded border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs">
+      {state.kind === "submitting" && (
+        <div className="text-amber-300">⏳ {state.reason}…</div>
+      )}
+      {state.kind === "broadcast" && (
+        <div>
+          <div className="text-emerald-300">✓ broadcast</div>
+          <a
+            href={txUrl({ chain_id: chainId }, state.hash)}
+            target="_blank"
+            rel="noreferrer"
+            className="break-all font-mono text-emerald-300 hover:underline"
+          >
+            {state.hash}
+          </a>
+          <div className="mt-1 text-zinc-500">waiting for confirmation…</div>
+        </div>
+      )}
+      {state.kind === "confirmed" && (
+        <div>
+          <div className="text-emerald-300">✓ confirmed in block #{state.blockNumber.toString()}</div>
+          <a
+            href={txUrl({ chain_id: chainId }, state.hash)}
+            target="_blank"
+            rel="noreferrer"
+            className="break-all font-mono text-emerald-300 hover:underline"
+          >
+            {state.hash}
+          </a>
+          {followUpLabel && <div className="mt-1 text-zinc-500">{followUpLabel}</div>}
+        </div>
+      )}
+      {state.kind === "error" && (
+        <pre className="whitespace-pre-wrap text-rose-300">{state.message}</pre>
+      )}
+    </div>
+  );
+}
+
 export function SelfTab() {
   const [status, setStatus] = useState<SelfStatus | null>(null);
   const [bootError, setBootError] = useState<string | null>(null);
@@ -43,6 +100,14 @@ export function SelfTab() {
   const [registerResult, setRegisterResult] = useState<SelfRegisterResult | null>(null);
   const [registerError, setRegisterError] = useState<string | null>(null);
   const [registering, setRegistering] = useState(false);
+
+  // Wallet path. When a visitor has connected their own wallet, we always
+  // ask the server for dry-run calldata, then submit it through wagmi —
+  // server-side signing is reserved for the operator (the team running the
+  // backend with PRIVATE_KEY set).
+  const { isConnected, address: walletAddress } = useAccount();
+  const registerSubmit = useSubmitServerTx();
+  const updateSubmit = useSubmitServerTx();
 
   const [updateAgentId, setUpdateAgentId] = useState<number | null>(null);
   const [updateResult, setUpdateResult] = useState<SelfUpdateCardResult | null>(null);
@@ -102,19 +167,25 @@ export function SelfTab() {
     }
   }, [status, updateAgentId]);
 
-  const onUpdateCard = async (dryRun: boolean) => {
+  const onUpdateCard = async (mode: "dry-run" | "wallet" | "server") => {
     if (updateAgentId == null) return;
     setUpdating(true);
     setUpdateError(null);
     setUpdateResult(null);
+    updateSubmit.reset();
     try {
+      // Wallet broadcasts always go through dry_run + wagmi.
+      const dry_run = mode !== "server";
       const res = await api.selfUpdateCard({
         agent_id: updateAgentId,
         axl_pubkey: axlPubkey || undefined,
         api_url: apiUrl || undefined,
-        dry_run: dryRun,
+        dry_run,
       });
       setUpdateResult(res);
+      if (mode === "wallet" && res.mode === "dry_run") {
+        await updateSubmit.submit(res);
+      }
     } catch (e) {
       setUpdateError((e as Error).message || String(e));
     } finally {
@@ -126,12 +197,21 @@ export function SelfTab() {
     setRegistering(true);
     setRegisterError(null);
     setRegisterResult(null);
+    registerSubmit.reset();
     try {
+      // When a wallet is connected, always force dry-run on the server so
+      // we get calldata + the contract address back, and submit through
+      // wagmi. When no wallet is connected, the existing behaviour stands —
+      // the server signs if PRIVATE_KEY is set, otherwise returns calldata.
       const res = await api.selfRegister({
         axl_pubkey: axlPubkey || undefined,
         api_url: apiUrl || undefined,
+        dry_run: isConnected,
       });
       setRegisterResult(res);
+      if (isConnected && res.mode === "dry_run") {
+        await registerSubmit.submit(res);
+      }
     } catch (e) {
       setRegisterError((e as Error).message || String(e));
     } finally {
@@ -308,10 +388,23 @@ export function SelfTab() {
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button
             onClick={onRegister}
-            disabled={registering}
+            disabled={registering || registerSubmit.state.kind === "submitting"}
+            title={
+              isConnected
+                ? "Server returns calldata; your wallet signs and broadcasts"
+                : signerLive
+                  ? "Server signs with the operator PRIVATE_KEY"
+                  : "No signer available — preview-only"
+            }
             className="rounded bg-emerald-500/20 px-3 py-1.5 text-sm font-medium text-emerald-200 ring-1 ring-emerald-400/30 hover:bg-emerald-500/30 disabled:opacity-50"
           >
-            {registering ? "Submitting…" : signerLive ? "Sign & broadcast" : "Run dry-run"}
+            {registering || registerSubmit.state.kind === "submitting"
+              ? "Submitting…"
+              : isConnected
+                ? "Sign with wallet"
+                : signerLive
+                  ? "Sign & broadcast (server)"
+                  : "Run dry-run"}
           </button>
           <button
             onClick={() => refresh({ axl_pubkey: axlPubkey || undefined })}
@@ -319,7 +412,17 @@ export function SelfTab() {
           >
             Refresh card preview
           </button>
+          {isConnected && (
+            <span className="text-[11px] text-zinc-500">
+              wallet: <code className="font-mono text-emerald-300">{walletAddress?.slice(0, 6)}…{walletAddress?.slice(-4)}</code>
+            </span>
+          )}
         </div>
+        <WalletSubmitStatus
+          state={registerSubmit.state}
+          chainId={status?.chain_id ?? 84532}
+          followUpLabel="agent_id will appear once the tx confirms — refresh below"
+        />
         {registerError && (
           <pre className="mt-3 whitespace-pre-wrap rounded border border-rose-900 bg-rose-950/40 p-3 text-xs text-rose-200">
             {registerError}
@@ -415,25 +518,39 @@ export function SelfTab() {
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button
-              onClick={() => onUpdateCard(true)}
+              onClick={() => onUpdateCard("dry-run")}
               disabled={updating || updateAgentId == null}
               className="rounded bg-zinc-800/60 px-3 py-1.5 text-sm text-zinc-300 ring-1 ring-zinc-700 hover:bg-zinc-800 disabled:opacity-50"
             >
               {updating ? "Submitting…" : "Preview (dry-run)"}
             </button>
             <button
-              onClick={() => onUpdateCard(false)}
-              disabled={updating || updateAgentId == null || !signerLive}
+              onClick={() => onUpdateCard(isConnected ? "wallet" : "server")}
+              disabled={
+                updating || updateAgentId == null || (!isConnected && !signerLive) ||
+                updateSubmit.state.kind === "submitting"
+              }
               title={
-                !signerLive
-                  ? "Set PRIVATE_KEY in .env to enable broadcast"
-                  : "Sign + broadcast setAgentURI"
+                isConnected
+                  ? "Server returns calldata; your wallet signs and broadcasts"
+                  : signerLive
+                    ? "Server signs with the operator PRIVATE_KEY"
+                    : "Connect a wallet (or set PRIVATE_KEY) to broadcast"
               }
               className="rounded bg-emerald-500/20 px-3 py-1.5 text-sm font-medium text-emerald-200 ring-1 ring-emerald-400/30 hover:bg-emerald-500/30 disabled:opacity-50"
             >
-              {updating ? "Submitting…" : "Sign & broadcast"}
+              {updating || updateSubmit.state.kind === "submitting"
+                ? "Submitting…"
+                : isConnected
+                  ? "Sign with wallet"
+                  : "Sign & broadcast (server)"}
             </button>
           </div>
+          <WalletSubmitStatus
+            state={updateSubmit.state}
+            chainId={status?.chain_id ?? 84532}
+            followUpLabel="card update will be visible after the tx confirms"
+          />
           {updateError && (
             <pre className="mt-3 whitespace-pre-wrap rounded border border-rose-900 bg-rose-950/40 p-3 text-xs text-rose-200">
               {updateError}

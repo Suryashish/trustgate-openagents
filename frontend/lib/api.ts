@@ -221,6 +221,7 @@ export type FeedbackResult = {
   receipt_error?: string | null;
   tx?: Record<string, unknown> | null;
   calldata?: string | null;
+  to?: string | null;
   elapsed_seconds: number;
   error?: string | null;
 };
@@ -439,6 +440,7 @@ export const api = {
     endpoint?: string;
     feedback_uri?: string;
     feedback_payload?: Record<string, unknown>;
+    dry_run?: boolean;
   }) => jget<FeedbackResult>("/api/write-feedback", { method: "POST", body: JSON.stringify(body) }),
   // Phase 9
   setupStatus: () => jget<SetupStatus>("/api/setup/status"),

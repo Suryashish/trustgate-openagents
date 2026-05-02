@@ -354,6 +354,7 @@ class RegistryClient:
         score: float,
         *,
         private_key: Optional[str] = None,
+        dry_run: bool = False,
         wait_for_receipt: bool = True,
         receipt_timeout: float = 120.0,
         **kwargs,
@@ -362,13 +363,14 @@ class RegistryClient:
 
         Returns one of:
           - {"mode": "dry_run", "tx": {...}, "calldata": "0x..."}
-              when no private_key is provided (and PRIVATE_KEY env var is empty).
+              when `dry_run=True`, no private_key is provided, and the
+              PRIVATE_KEY env var is empty.
           - {"mode": "live", "tx_hash": "0x...", "block_number": N, "status": 1}
               when broadcast succeeded.
 
         Raises if signing/broadcasting itself errors.
         """
-        pk = private_key or os.getenv("PRIVATE_KEY", "")
+        pk = "" if dry_run else (private_key or os.getenv("PRIVATE_KEY", ""))
         if not pk:
             # build for the zero address so callers can inspect the calldata
             tx = self.build_feedback_tx(
@@ -378,6 +380,7 @@ class RegistryClient:
                 "mode": "dry_run",
                 "tx": {k: (hex(v) if isinstance(v, int) and k != "chainId" else v) for k, v in tx.items()},
                 "calldata": tx["data"],
+                "to": tx["to"],
                 "note": "set PRIVATE_KEY in .env to sign and broadcast",
             }
 

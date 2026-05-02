@@ -228,6 +228,7 @@ class FeedbackResult:
     receipt_error: Optional[str] = None
     tx: Optional[dict] = None     # populated only in dry_run
     calldata: Optional[str] = None
+    to: Optional[str] = None      # populated in dry_run — Reputation Registry address
     elapsed_seconds: float = 0.0
     error: Optional[str] = None
 
@@ -244,6 +245,7 @@ def write_feedback(
     feedback_uri: str = "",
     feedback_payload: Optional[dict] = None,
     private_key: Optional[str] = None,
+    dry_run: bool = False,
     client: Optional[RegistryClient] = None,
     wait_for_receipt: bool = True,
 ) -> FeedbackResult:
@@ -270,6 +272,7 @@ def write_feedback(
             endpoint=endpoint, feedback_uri=feedback_uri,
             feedback_hash=fb_hash, value_decimals=0,
             private_key=private_key,
+            dry_run=dry_run,
             wait_for_receipt=wait_for_receipt,
         )
     except Exception as e:
@@ -292,6 +295,7 @@ def write_feedback(
     if result["mode"] == "dry_run":
         out.tx = result["tx"]
         out.calldata = result["calldata"]
+        out.to = result.get("to")
     else:
         out.tx_hash = result["tx_hash"]
         out.block_number = result.get("block_number")
