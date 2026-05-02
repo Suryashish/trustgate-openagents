@@ -12,8 +12,12 @@ dockerfilePath = "Dockerfile"
 
 [deploy]
 # /api/health is cheap (no chain calls) and confirms the API booted.
+# Generous timeout: cold-start does AXL peering + worker spawn + registry
+# cache pre-warm + gunicorn boot. 300 s is "give Railway every reasonable
+# chance to succeed before declaring failure" — it doesn't slow down a
+# healthy boot, just changes when an unhealthy boot is reported.
 healthcheckPath = "/api/health"
-healthcheckTimeout = 30
+healthcheckTimeout = 300
 
 # Restart on crash but don't loop forever — Railway will give up after this
 # many consecutive failures, which is what we want during initial deploy
