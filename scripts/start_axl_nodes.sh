@@ -19,7 +19,17 @@ mkdir -p "$ROOT/n1" "$ROOT/n2" "$ROOT/n3"
 cp -u "$SRC_AXL/node" "$ROOT/node"
 chmod +x "$ROOT/node"
 
-[[ -f "$ROOT/n1/private.pem" ]] || cp "$SRC_AXL/private.pem" "$ROOT/n1/private.pem"
+# n1's pem: prefer the local checkout (gives a stable pubkey for local dev),
+# fall back to a fresh ed25519 keypair when the file isn't bundled. The
+# checked-in copy is .gitignored on purpose (don't ship private keys to a
+# public repo) — Railway / Docker builds will hit the openssl branch.
+if [[ ! -f "$ROOT/n1/private.pem" ]]; then
+    if [[ -f "$SRC_AXL/private.pem" ]]; then
+        cp "$SRC_AXL/private.pem" "$ROOT/n1/private.pem"
+    else
+        openssl genpkey -algorithm ed25519 -out "$ROOT/n1/private.pem"
+    fi
+fi
 [[ -f "$ROOT/n2/private.pem" ]] || openssl genpkey -algorithm ed25519 -out "$ROOT/n2/private.pem"
 [[ -f "$ROOT/n3/private.pem" ]] || openssl genpkey -algorithm ed25519 -out "$ROOT/n3/private.pem"
 
