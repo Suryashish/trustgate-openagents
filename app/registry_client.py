@@ -402,6 +402,131 @@ class RegistryClient:
                 result["receipt_error"] = f"{type(e).__name__}: {e}"
         return result
 
+    # ----- Phase 6: self-registration --------------------------------------
+    #
+    # IdentityRegistry exposes three `register` overloads:
+    #   register()                                     -> agentId
+    #   register(string agentURI)                      -> agentId
+    #   register(string agentURI, MetadataEntry[])     -> agentId
+    #
+    # We use the single-string overload — the agent card lives entirely
+    # off-chain (data:/ipfs:/https:), the contract just stores the URI.
+
+    def build_register_tx(
+        self,
+        agent_uri: str,
+        *,
+        from_address: str,
+        gas: int = 350_000,
+        max_fee_per_gas: int | None = None,
+        max_priority_fee_per_gas: int | None = None,
+    ) -> dict:
+        """Build (but do not send) `register(string agentURI)`."""
+        if not agent_uri:
+            raise ValueError("agent_uri is required")
+        from_address = Web3.to_checksum_address(from_address)
+        # Pick the single-string overload explicitly — the no-arg overload also
+        # exists, so passing arity-by-position would still resolve to the right
+        # one but being explicit is safer if the ABI evolves.
+        fn = self.identity.get_function_by_signature("register(string)")(str(agent_uri))
+        nonce = self.w3.eth.get_transaction_count(from_address, "pending")
+        try:
+            fees = self.w3.eth.fee_history(1, "latest")
+            base = fees["baseFeePerGas"][-1]
+            tip = self.w3.to_wei(1, "gwei")
+            mfpg = max_fee_per_gas if max_fee_per_gas is not None else int(base * 2 + tip)
+            mpfg = max_priority_fee_per_gas if max_priority_fee_per_gas is not None else tip
+        except Exception:
+            mfpg = max_fee_per_gas or self.w3.to_wei(2, "gwei")
+            mpfg = max_priority_fee_per_gas or self.w3.to_wei(1, "gwei")
+        return fn.build_transaction({
+            "from": from_address,
+            "nonce": nonce,
+            "gas": gas,
+            "maxFeePerGas": mfpg,
+            "maxPriorityFeePerGas": mpfg,
+            "chainId": self.chain_id,
+        })
+
+    def _agent_id_from_receipt(self, receipt) -> Optional[int]:
+        """Extract agentId from the `Registered` event log in a tx receipt."""
+        try:
+            events = self.identity.events.Registered().process_receipt(receipt)
+            if events:
+                return int(events[0].args.agentId)
+        except Exception:
+            pass
+        return None
+
+    def send_register(
+        self,
+        agent_uri: str,
+        *,
+        private_key: Optional[str] = None,
+        wait_for_receipt: bool = True,
+        receipt_timeout: float = 180.0,
+        **kwargs,
+    ) -> dict:
+        """Sign and broadcast a `register(string)` tx.
+
+        Returns one of:
+          {"mode": "dry_run", "tx": {...}, "calldata": "0x..."}
+            — when no private_key is provided.
+          {"mode": "live", "tx_hash": "0x...", "agent_id": N, "block_number": N, ...}
+            — when broadcast succeeded; `agent_id` parsed from the Registered log.
+        """
+        pk = private_key or os.getenv("PRIVATE_KEY", "")
+        if not pk:
+            tx = self.build_register_tx(agent_uri, from_address="0x" + "0" * 40, **kwargs)
+            return {
+                "mode": "dry_run",
+                "agent_uri": agent_uri,
+                "tx": {k: (hex(v) if isinstance(v, int) and k != "chainId" else v) for k, v in tx.items()},
+                "calldata": tx["data"],
+                "to": tx["to"],
+                "note": "set PRIVATE_KEY in .env to sign and broadcast",
+            }
+        from eth_account import Account
+        acct = Account.from_key(pk)
+        tx = self.build_register_tx(agent_uri, from_address=acct.address, **kwargs)
+        signed = acct.sign_transaction(tx)
+        tx_hash = self.w3.eth.send_raw_transaction(signed.raw_transaction)
+        result = {
+            "mode": "live",
+            "from": acct.address,
+            "agent_uri": agent_uri,
+            "tx_hash": tx_hash.hex(),
+            "submitted_at_block": int(self.w3.eth.block_number),
+        }
+        if wait_for_receipt:
+            try:
+                receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=receipt_timeout)
+                result["block_number"] = int(receipt.blockNumber)
+                result["status"] = int(receipt.status)
+                result["gas_used"] = int(receipt.gasUsed)
+                aid = self._agent_id_from_receipt(receipt)
+                if aid is not None:
+                    result["agent_id"] = aid
+            except Exception as e:
+                result["receipt_error"] = f"{type(e).__name__}: {e}"
+        return result
+
+    def find_owned_agent_ids(self, owner: str) -> list[int]:
+        """Scan the local cache for agents whose owner == this address."""
+        try:
+            owner_cs = Web3.to_checksum_address(owner)
+        except Exception:
+            return []
+        cache = self._load_cache()
+        ids: list[int] = []
+        for row in cache.get("agents", {}).values():
+            try:
+                if Web3.to_checksum_address(row.get("owner", "0x0")) == owner_cs:
+                    ids.append(int(row["agent_id"]))
+            except Exception:
+                continue
+        return sorted(ids)
+
     # ----- read helpers (Phase 3) -----------------------------------------
 
     def get_recent_feedback(self, agent_id: int, *, limit: int = 10) -> list[dict]:

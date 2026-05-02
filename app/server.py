@@ -43,6 +43,8 @@ from keeper_client import (  # noqa: E402
     write_feedback as keeper_write_feedback,
 )
 from registry_client import RegistryClient, resolve_agent_card  # noqa: E402
+from ens_client import default_resolver as default_ens_resolver  # noqa: E402
+from self_registration import build_self_card, encode_self_card_uri  # noqa: E402
 
 app = Flask(__name__)
 CORS(app)
@@ -433,6 +435,120 @@ def post_complete_hire():
         client=client(),
     )
     return jsonify(out.to_dict())
+
+
+# ---- Phase 6: ENS + self-registration ------------------------------------
+
+
+@app.get("/api/ens/resolve")
+def ens_resolve():
+    """Best-effort reverse-resolve an address to its primary ENS name.
+
+    Address can also be passed as ?name= for forward resolution. ENS lives on
+    Ethereum mainnet, not Base, so this hits a different RPC (ENS_RPC_URL).
+    """
+    addr = request.args.get("address", "").strip()
+    name = request.args.get("name", "").strip()
+    resolver = default_ens_resolver()
+    out: dict[str, Any] = {"rpc_url": resolver.rpc_url}
+    if addr:
+        ens_name = resolver.name_for(addr)
+        out.update({"address": addr, "name": ens_name})
+        if ens_name:
+            out["forward_address"] = resolver.address_for(ens_name)
+    elif name:
+        out.update({"name": name, "address": resolver.address_for(name)})
+    else:
+        return jsonify({"error": "pass ?address= or ?name="}), 400
+    return jsonify(out)
+
+
+@app.get("/api/self/status")
+def self_status():
+    """Reports everything the dashboard needs before showing a 'register' button.
+
+    - signing key state (from PRIVATE_KEY)
+    - signer's ENS name (mainnet) — drives the ENS prize narrative
+    - already-registered agent ids owned by the signer (from local cache)
+    - the agent card we'd register (so the user can review before signing)
+    """
+    rc = client()
+    pk = os.getenv("PRIVATE_KEY", "")
+    signer: dict[str, Any] = {"private_key_configured": bool(pk)}
+    address: str | None = None
+    ens_name: str | None = None
+    if pk:
+        try:
+            from eth_account import Account
+            acct = Account.from_key(pk)
+            address = acct.address
+            balance = rc.w3.eth.get_balance(address)
+            signer.update({
+                "address": address,
+                "balance_wei": int(balance),
+                "balance_eth": float(rc.w3.from_wei(balance, "ether")),
+            })
+        except Exception as e:
+            signer["error"] = f"{type(e).__name__}: {e}"
+    if address:
+        ens_name = default_ens_resolver().name_for(address)
+        signer["ens_name"] = ens_name
+
+    owned: list[int] = rc.find_owned_agent_ids(address) if address else []
+
+    card = build_self_card(
+        ens_name=ens_name,
+        axl_pubkey=request.args.get("axl_pubkey") or None,
+        api_url=os.getenv("TRUSTGATE_PUBLIC_URL"),
+    )
+    agent_uri = encode_self_card_uri(card)
+    return jsonify({
+        "network": NETWORK,
+        "identity_registry": rc.identity_address,
+        "chain_id": rc.chain_id,
+        "signer": signer,
+        "owned_agent_ids": owned,
+        "card": card,
+        "agent_uri": agent_uri,
+        "agent_uri_bytes": len(agent_uri),
+    })
+
+
+@app.post("/api/self/register")
+def self_register():
+    """Phase 6: register TrustGate as an ERC-8004 agent.
+
+    Body fields (all optional):
+      axl_pubkey            — endpoints[name="axl"].endpoint to publish
+      api_url               — endpoints[name="http"].endpoint to publish
+      ens_name              — pinned in the card under .ens; if omitted,
+                              we attempt to reverse-resolve the signer
+      private_key           — overrides PRIVATE_KEY env var (NEVER log this)
+      wait_for_receipt      — bool, default True
+    """
+    body = request.get_json(force=True, silent=True) or {}
+    rc = client()
+    pk = body.get("private_key") or os.getenv("PRIVATE_KEY", "")
+    ens_name = body.get("ens_name")
+    if not ens_name and pk:
+        try:
+            from eth_account import Account
+            ens_name = default_ens_resolver().name_for(Account.from_key(pk).address)
+        except Exception:
+            ens_name = None
+    card = build_self_card(
+        ens_name=ens_name,
+        axl_pubkey=body.get("axl_pubkey") or None,
+        api_url=body.get("api_url") or os.getenv("TRUSTGATE_PUBLIC_URL"),
+    )
+    agent_uri = encode_self_card_uri(card)
+    res = rc.send_register(
+        agent_uri,
+        private_key=pk or None,
+        wait_for_receipt=bool(body.get("wait_for_receipt", True)),
+    )
+    res["card"] = card
+    return jsonify(res)
 
 
 @app.post("/api/axl/send-job")

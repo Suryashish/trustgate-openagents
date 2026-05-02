@@ -6,6 +6,7 @@ import { AgentsTab } from "./components/AgentsTab";
 import { HireTab } from "./components/HireTab";
 import { AxlTab } from "./components/AxlTab";
 import { SettleTab } from "./components/SettleTab";
+import { SelfTab } from "./components/SelfTab";
 import { api, type CacheStatus, type NetworkInfo } from "@/lib/api";
 
 const TABS = [
@@ -14,6 +15,7 @@ const TABS = [
   { id: "hire", label: "Hire" },
   { id: "axl", label: "AXL Bridge" },
   { id: "settle", label: "Settle" },
+  { id: "self", label: "Self" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -92,8 +94,10 @@ export default function Home() {
           <HireTab />
         ) : tab === "axl" ? (
           <AxlTab />
-        ) : (
+        ) : tab === "settle" ? (
           <SettleTab />
+        ) : (
+          <SelfTab />
         )}
       </main>
 

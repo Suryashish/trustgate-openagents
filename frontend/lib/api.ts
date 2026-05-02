@@ -224,6 +224,50 @@ export type FeedbackResult = {
   error?: string | null;
 };
 
+export type SelfStatus = {
+  network: string;
+  identity_registry: string;
+  chain_id: number;
+  signer: {
+    private_key_configured: boolean;
+    address?: string;
+    balance_wei?: number;
+    balance_eth?: number;
+    ens_name?: string | null;
+    error?: string;
+  };
+  owned_agent_ids: number[];
+  card: AgentCard;
+  agent_uri: string;
+  agent_uri_bytes: number;
+};
+
+export type SelfRegisterResult = {
+  mode: "dry_run" | "live";
+  agent_uri: string;
+  card?: AgentCard;
+  // dry-run
+  to?: string;
+  calldata?: string;
+  tx?: Record<string, unknown>;
+  note?: string;
+  // live
+  from?: string;
+  tx_hash?: string;
+  agent_id?: number;
+  block_number?: number;
+  status?: number;
+  gas_used?: number;
+  receipt_error?: string;
+};
+
+export type EnsResolveResult = {
+  rpc_url: string;
+  address?: string;
+  name?: string | null;
+  forward_address?: string | null;
+};
+
 export type CompleteHireResult = {
   hire: HireResult;
   settlement: SettlementResult | null;
@@ -333,6 +377,27 @@ export const api = {
     feedback_uri?: string;
     feedback_payload?: Record<string, unknown>;
   }) => jget<FeedbackResult>("/api/write-feedback", { method: "POST", body: JSON.stringify(body) }),
+  // Phase 6
+  selfStatus: (params: { axl_pubkey?: string } = {}) => {
+    const q = new URLSearchParams();
+    if (params.axl_pubkey) q.set("axl_pubkey", params.axl_pubkey);
+    const qs = q.toString();
+    return jget<SelfStatus>(`/api/self/status${qs ? `?${qs}` : ""}`);
+  },
+  selfRegister: (body: {
+    axl_pubkey?: string;
+    api_url?: string;
+    ens_name?: string;
+    private_key?: string;
+    wait_for_receipt?: boolean;
+  }) => jget<SelfRegisterResult>("/api/self/register", { method: "POST", body: JSON.stringify(body) }),
+  ensResolve: (params: { address?: string; name?: string }) => {
+    const q = new URLSearchParams();
+    if (params.address) q.set("address", params.address);
+    if (params.name) q.set("name", params.name);
+    return jget<EnsResolveResult>(`/api/ens/resolve?${q.toString()}`);
+  },
+
   completeHire: (body: {
     capability?: string;
     service?: string;
