@@ -283,6 +283,27 @@ export type SelfStatus = {
   agent_uri_bytes: number;
 };
 
+export type SelfUpdateCardResult = {
+  mode: "dry_run" | "live" | "error";
+  agent_id: number;
+  new_uri: string;
+  card?: AgentCard;
+  // dry-run
+  to?: string;
+  calldata?: string;
+  tx?: Record<string, unknown>;
+  note?: string;
+  // live
+  from?: string;
+  tx_hash?: string;
+  block_number?: number;
+  status?: number;
+  gas_used?: number;
+  receipt_error?: string;
+  // error (e.g. signer not owner)
+  error?: string;
+};
+
 export type SelfRegisterResult = {
   mode: "dry_run" | "live";
   agent_uri: string;
@@ -439,7 +460,21 @@ export const api = {
     ens_name?: string;
     private_key?: string;
     wait_for_receipt?: boolean;
+    dry_run?: boolean;
   }) => jget<SelfRegisterResult>("/api/self/register", { method: "POST", body: JSON.stringify(body) }),
+  selfUpdateCard: (body: {
+    agent_id: number;
+    axl_pubkey?: string;
+    api_url?: string;
+    ens_name?: string;
+    private_key?: string;
+    wait_for_receipt?: boolean;
+    dry_run?: boolean;
+  }) =>
+    jget<SelfUpdateCardResult>("/api/self/update-card", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
   ensResolve: (params: { address?: string; name?: string }) => {
     const q = new URLSearchParams();
     if (params.address) q.set("address", params.address);

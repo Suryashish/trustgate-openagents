@@ -720,6 +720,51 @@ def self_register():
     return jsonify(res)
 
 
+# ---- Phase 11: setAgentURI ------------------------------------------------
+
+
+@app.post("/api/self/update-card")
+def self_update_card():
+    """Phase 11: re-publish TrustGate's agent card on an existing agent_id.
+
+    Uses `setAgentURI(agentId, newURI)` so reputation history is preserved.
+    Body fields:
+      agent_id              — required. ID returned by /api/self/register
+      axl_pubkey, api_url, ens_name  — same shape as /api/self/register
+      private_key           — overrides PRIVATE_KEY env var (NEVER log)
+      dry_run               — bool, force preview path even when key is set
+      wait_for_receipt      — bool, default True
+    """
+    body = request.get_json(force=True, silent=True) or {}
+    agent_id = body.get("agent_id")
+    if agent_id is None:
+        return jsonify({"error": "agent_id is required"}), 400
+    rc = client()
+    pk = body.get("private_key") or os.getenv("PRIVATE_KEY", "")
+    ens_name = body.get("ens_name")
+    if not ens_name and pk:
+        try:
+            from eth_account import Account
+            ens_name = default_ens_resolver().name_for(Account.from_key(pk).address)
+        except Exception:
+            ens_name = None
+    card = build_self_card(
+        ens_name=ens_name,
+        axl_pubkey=body.get("axl_pubkey") or None,
+        api_url=body.get("api_url") or os.getenv("TRUSTGATE_PUBLIC_URL"),
+    )
+    new_uri = encode_self_card_uri(card)
+    res = rc.send_set_agent_uri(
+        int(agent_id),
+        new_uri,
+        private_key=pk or None,
+        dry_run=bool(body.get("dry_run", False)),
+        wait_for_receipt=bool(body.get("wait_for_receipt", True)),
+    )
+    res["card"] = card
+    return jsonify(res)
+
+
 @app.post("/api/axl/send-job")
 def axl_send_job():
     body = request.get_json(force=True, silent=True) or {}
