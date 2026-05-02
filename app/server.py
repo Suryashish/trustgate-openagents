@@ -74,11 +74,12 @@ def client() -> RegistryClient:
         return _client
 
 
-def _agent_to_dict(a) -> dict[str, Any]:
+def _agent_to_dict(a, *, owner_ens: str | None = None) -> dict[str, Any]:
     return {
         "agent_id": a.agent_id,
         "name": a.name,
         "owner": a.owner,
+        "owner_ens": owner_ens,
         "agent_uri": a.agent_uri,
         "block": a.block,
         "tx_hash": a.tx_hash,
@@ -88,6 +89,31 @@ def _agent_to_dict(a) -> dict[str, Any]:
         "card": a.card,
         "card_load_error": a.card_load_error,
     }
+
+
+def _resolve_owner_enss(owners: list[str]) -> dict[str, str | None]:
+    """Best-effort batch reverse-resolve a list of addresses → ENS names.
+
+    The resolver is TTL-cached (10 min by default), so repeated calls for
+    the same address are essentially free. We deliberately catch every
+    error here — ENS RPC is mainnet, separate from Base, and will flap.
+    The dashboard never blocks on it.
+    """
+    out: dict[str, str | None] = {}
+    if not owners:
+        return out
+    try:
+        resolver = default_ens_resolver()
+        for o in owners:
+            try:
+                out[o] = resolver.name_for(o)
+            except Exception:
+                out[o] = None
+    except Exception:
+        # resolver itself failed to construct — return all None
+        for o in owners:
+            out[o] = None
+    return out
 
 
 # ---- core ------------------------------------------------------------------
@@ -153,11 +179,18 @@ def list_agents():
         card_timeout=2.0,
     )
     sliced = agents[offset:offset + limit]
+    # Best-effort ENS for the owners on this page only — N RPC calls max,
+    # and the resolver is TTL-cached so paging back to a recent page is
+    # near-instant. Disable with ?ens=0 if the mainnet RPC is having a bad
+    # day.
+    enss: dict[str, str | None] = {}
+    if request.args.get("ens", "1") not in {"0", "false", "False"}:
+        enss = _resolve_owner_enss([a.owner for a in sliced])
     return jsonify({
         "total_returned": len(agents),
         "offset": offset,
         "limit": limit,
-        "agents": [_agent_to_dict(a) for a in sliced],
+        "agents": [_agent_to_dict(a, owner_ens=enss.get(a.owner)) for a in sliced],
     })
 
 
@@ -181,9 +214,13 @@ def get_agent(agent_id: int):
         err = f"{type(e).__name__}: {e}"
     rep = rc.get_reputation(agent_id)
     rc._save_card_cache()
+    owner_ens: str | None = None
+    if request.args.get("ens", "1") not in {"0", "false", "False"}:
+        owner_ens = _resolve_owner_enss([row["owner"]]).get(row["owner"])
     return jsonify({
         "agent_id": agent_id,
         "owner": row["owner"],
+        "owner_ens": owner_ens,
         "agent_uri": row["agent_uri"],
         "live_token_uri": live_uri,
         "block": row["block"],
@@ -329,6 +366,137 @@ def post_hire():
         api_port=api_port,
     )
     return jsonify(out.to_dict())
+
+
+@app.get("/api/capabilities")
+def list_capabilities():
+    """Phase 9: union of all advertised capabilities across hydrated cards.
+
+    Powers the Hire tab's typeahead. Reads from the on-disk card cache rather
+    than re-hydrating every agent (the full registry is 4 700+ agents, that
+    would be unbearable per-keystroke). Counts let the dashboard show the
+    most popular capabilities first.
+    """
+    rc = client()
+    counts: dict[str, int] = {}
+    from registry_client import extract_capabilities  # local import: avoid cold-import side-effects
+    for entry in rc._card_cache.values():
+        if not isinstance(entry, dict):
+            continue
+        card = entry.get("card")
+        # Some agent cards in the wild are arrays or strings rather than the
+        # expected object — extract_capabilities only handles dicts, so skip.
+        if not isinstance(card, dict):
+            continue
+        try:
+            caps = extract_capabilities(card)
+        except Exception:
+            continue
+        for c in caps:
+            if not c:
+                continue
+            counts[c] = counts.get(c, 0) + 1
+    rows = sorted(
+        ({"capability": k, "count": v} for k, v in counts.items()),
+        key=lambda r: (-r["count"], r["capability"]),
+    )
+    return jsonify({"total": len(rows), "capabilities": rows})
+
+
+@app.get("/api/setup/status")
+def setup_status():
+    """Phase 9: aggregated readiness probe consumed by the first-run wizard
+    and the KeeperHub setup checklist.
+
+    Returns one boolean per setup step plus a humanised status / hint, so the
+    frontend can render a checklist without re-implementing the truth table.
+    Never raises — every probe is wrapped so a single broken credential
+    doesn't 500 the whole status call.
+    """
+    rc = client()
+    has_pk = bool(os.getenv("PRIVATE_KEY", ""))
+    has_keeper_key = bool(os.getenv("KEEPERHUB_API_KEY", ""))
+
+    # ----- signer / private key -------------------------------------------
+    signer: dict[str, Any] = {
+        "configured": has_pk,
+        "valid": False,
+        "address": None,
+        "balance_eth": None,
+        "balance_warning": None,  # e.g. "below 0.0005 ETH" when low
+        "error": None,
+    }
+    if has_pk:
+        try:
+            from eth_account import Account
+            acct = Account.from_key(os.getenv("PRIVATE_KEY"))
+            signer["valid"] = True
+            signer["address"] = acct.address
+            balance_wei = int(rc.w3.eth.get_balance(acct.address))
+            balance_eth = float(rc.w3.from_wei(balance_wei, "ether"))
+            signer["balance_eth"] = balance_eth
+            if balance_eth < 0.0005:
+                signer["balance_warning"] = "below 0.0005 ETH — top up via the Sepolia faucet"
+        except Exception as e:
+            signer["error"] = f"{type(e).__name__}: {e}"
+
+    # ----- ENS resolver ---------------------------------------------------
+    try:
+        ens_status = default_ens_resolver().status()
+    except Exception as e:
+        ens_status = {"ok": False, "error": f"{type(e).__name__}: {e}"}
+
+    # ----- KeeperHub: probe MCP transport reachability --------------------
+    mcp_url = os.getenv("KEEPERHUB_MCP_URL", "http://127.0.0.1:8787")
+    mcp_reachable = False
+    mcp_error: str | None = None
+    if has_keeper_key:
+        try:
+            r = http_requests.get(mcp_url + "/health", timeout=2.0)
+            mcp_reachable = r.status_code < 500
+        except http_requests.exceptions.RequestException as e:
+            mcp_error = f"{type(e).__name__}: {str(e)[:140]}"
+
+    keeperhub = {
+        "api_key_configured": has_keeper_key,
+        "mode": "live" if has_keeper_key else "stub",
+        "network": KEEPERHUB_NETWORK,
+        "token": KEEPERHUB_PAYER_TOKEN,
+        "mcp_url": mcp_url,
+        "mcp_reachable": mcp_reachable,
+        "mcp_error": mcp_error,
+    }
+
+    # ----- registry cache snapshot (so wizard can show "scan in progress") -
+    cache = rc._load_cache()
+    last = cache.get("last_scanned_block")
+    head = int(rc.w3.eth.block_number)
+    cache_state = {
+        "agents_in_cache": len(cache.get("agents", {})),
+        "head_block": head,
+        "last_scanned_block": last,
+        "blocks_behind": (head - last) if last else None,
+    }
+
+    # ----- overall ready signals ------------------------------------------
+    # Each "ready" maps to a checklist step the dashboard renders. The wizard
+    # treats `core_ready` as "user can use the dashboard end-to-end".
+    core_ready = signer["valid"] and (signer.get("balance_eth") or 0) >= 0.0005
+    keeper_ready = bool(has_keeper_key and mcp_reachable)
+
+    return jsonify({
+        "network": NETWORK,
+        "chain_id": rc.chain_id,
+        "signer": signer,
+        "ens": ens_status,
+        "keeperhub": keeperhub,
+        "cache": cache_state,
+        "ready": {
+            "core": core_ready,                  # signer + funded → register / give feedback works
+            "keeperhub_live": keeper_ready,      # API key + MCP reachable → real settlements
+            "stub_demo": True,                   # always works (workers + stub settlement)
+        },
+    })
 
 
 @app.get("/api/settlement/status")
@@ -545,6 +713,7 @@ def self_register():
     res = rc.send_register(
         agent_uri,
         private_key=pk or None,
+        dry_run=bool(body.get("dry_run", False)),
         wait_for_receipt=bool(body.get("wait_for_receipt", True)),
     )
     res["card"] = card

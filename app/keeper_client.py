@@ -113,13 +113,40 @@ def _live_settle(agent_wallet: str, amount: float, *, idempotency_key: str) -> S
     }
     audit: list[dict] = []
     t0 = time.time()
+    r = None
+    used = "live-mcp"
+    mcp_err: Optional[str] = None
+    api_err: Optional[str] = None
     try:
         r = requests.post(f"{KEEPERHUB_MCP_URL}/workflows", json=workflow_payload, headers=headers, timeout=15)
-        used = "live-mcp"
     except requests.exceptions.RequestException as e:
-        log.info(f"local MCP unreachable ({e}); falling back to API")
-        r = requests.post(f"{KEEPERHUB_API_URL}/workflows", json=workflow_payload, headers=headers, timeout=15)
-        used = "live-api"
+        mcp_err = f"{type(e).__name__}: {str(e)[:140]}"
+        log.info(f"local MCP unreachable ({mcp_err}); falling back to API")
+        try:
+            r = requests.post(f"{KEEPERHUB_API_URL}/workflows", json=workflow_payload, headers=headers, timeout=15)
+            used = "live-api"
+        except requests.exceptions.RequestException as e2:
+            api_err = f"{type(e2).__name__}: {str(e2)[:140]}"
+
+    if r is None:
+        # Both transports failed before we got an HTTP response. Report a
+        # structured error so the dashboard renders it cleanly instead of 500ing.
+        return SettlementResult(
+            mode="live-unreachable", workflow_id="", status="failed",
+            agent_wallet=agent_wallet, amount=float(amount),
+            token=KEEPERHUB_PAYER_TOKEN, network=KEEPERHUB_NETWORK,
+            error=(
+                "Could not reach either KeeperHub transport. "
+                f"MCP ({KEEPERHUB_MCP_URL}): {mcp_err}. "
+                f"API ({KEEPERHUB_API_URL}): {api_err or 'not tried'}. "
+                "Run a local KeeperHub MCP server, or set KEEPERHUB_API_URL to a reachable endpoint."
+            ),
+            audit_log=[
+                {"ts": time.time(), "step": "create_workflow", "ok": False, "transport": "mcp", "error": mcp_err},
+                *([{"ts": time.time(), "step": "create_workflow", "ok": False, "transport": "api", "error": api_err}] if api_err else []),
+            ],
+            elapsed_seconds=time.time() - t0,
+        )
 
     if r.status_code >= 400:
         return SettlementResult(

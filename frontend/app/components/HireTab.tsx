@@ -1,17 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, type FindBestResult, type ScoredCandidate } from "@/lib/api";
 
-const SUGGESTIONS = [
-  "swap",
-  "defi",
-  "trading",
-  "compliance",
-  "rwa",
-  "natural_language_processing/natural_language_generation/summarization",
-  "testing",
-];
+// Pinned shortcut chips. The full typeahead is populated from the live
+// /api/capabilities endpoint, but having a few fixed pivots avoids the
+// "what's even valid here?" cold start.
+const PINNED_CHIPS = ["agent_hiring", "defi", "swap", "summarise_documents", "testing"];
+
+// Cheap Levenshtein for "did you mean…?". Runs on at most a few thousand
+// strings client-side; far simpler than dragging in a fuzzy-match library.
+function lev(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const dp = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0));
+  for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+    }
+  }
+  return dp[a.length][b.length];
+}
 
 function Bar({ label, value, weight, color }: { label: string; value: number; weight: number; color: string }) {
   const widthRaw = `${Math.max(2, value * 100)}%`;
@@ -90,6 +103,57 @@ export function HireTab() {
   const [running, setRunning] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  // All capabilities advertised across the cached agent cards, with usage
+  // counts. Loaded once on mount; used both for the typeahead datalist and
+  // the "did you mean…?" suggestions when a search returns zero candidates.
+  const [allCaps, setAllCaps] = useState<{ capability: string; count: number }[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .capabilities()
+      .then((r) => {
+        if (cancelled) return;
+        setAllCaps(r.capabilities);
+      })
+      .catch(() => {
+        // best-effort — fall back to pinned chips
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Top capabilities by agent count → the chips row. Falls back to the
+  // pinned list when the cache is cold so the user still has something to
+  // click.
+  const topChips = useMemo(() => {
+    if (allCaps.length === 0) return PINNED_CHIPS;
+    const top = allCaps.slice(0, 8).map((c) => c.capability);
+    // ensure the pinned chips appear too (de-duped) — keeps the UX stable
+    // when the registry happens not to advertise our headline capabilities.
+    const seen = new Set(top);
+    for (const p of PINNED_CHIPS) {
+      if (!seen.has(p)) {
+        top.push(p);
+        seen.add(p);
+      }
+    }
+    return top.slice(0, 10);
+  }, [allCaps]);
+
+  // "Did you mean…?" — cheap edit-distance ranking against the full union.
+  const suggestions = useMemo(() => {
+    if (!capability || allCaps.length === 0) return [] as string[];
+    const cap = capability.toLowerCase();
+    if (allCaps.some((c) => c.capability === cap)) return [];
+    return allCaps
+      .map((c) => ({ c: c.capability, d: lev(cap, c.capability) }))
+      .filter((x) => x.d > 0 && x.d <= Math.max(2, Math.floor(cap.length / 3)))
+      .sort((a, b) => a.d - b.d)
+      .slice(0, 5)
+      .map((x) => x.c);
+  }, [capability, allCaps]);
+
   async function submit(e?: React.FormEvent) {
     e?.preventDefault();
     setRunning(true);
@@ -116,24 +180,63 @@ export function HireTab() {
     <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
       <form onSubmit={submit} className="space-y-4 rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
         <div>
-          <label className="block text-xs uppercase tracking-wider text-zinc-500">Capability</label>
+          <label className="block text-xs uppercase tracking-wider text-zinc-500">
+            Capability
+            {allCaps.length > 0 && (
+              <span className="ml-2 normal-case text-[10px] text-zinc-600">
+                · {allCaps.length} unique across the cached registry
+              </span>
+            )}
+          </label>
           <input
+            list="trustgate-capabilities"
             value={capability}
             onChange={(e) => setCapability(e.target.value.trim().toLowerCase())}
             className="mt-1 w-full rounded border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm focus:border-emerald-500 focus:outline-none"
           />
+          <datalist id="trustgate-capabilities">
+            {allCaps.map((c) => (
+              <option key={c.capability} value={c.capability}>
+                {c.count} agent{c.count === 1 ? "" : "s"}
+              </option>
+            ))}
+          </datalist>
           <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
-            {SUGGESTIONS.map((s) => (
+            {topChips.map((s) => (
               <button
                 key={s}
                 type="button"
                 onClick={() => setCapability(s)}
-                className="rounded bg-zinc-800 px-2 py-0.5 text-zinc-400 hover:text-zinc-100"
+                title={s}
+                className={
+                  "rounded px-2 py-0.5 transition " +
+                  (s === capability
+                    ? "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-400/30"
+                    : "bg-zinc-800 text-zinc-400 hover:text-zinc-100")
+                }
               >
                 {s.length > 28 ? `${s.slice(0, 28)}…` : s}
               </button>
             ))}
           </div>
+          {suggestions.length > 0 && (
+            <div className="mt-2 text-[11px] text-zinc-500">
+              Did you mean:{" "}
+              {suggestions.map((s, i) => (
+                <span key={s}>
+                  {i > 0 && ", "}
+                  <button
+                    type="button"
+                    onClick={() => setCapability(s)}
+                    className="text-emerald-400 hover:underline"
+                  >
+                    {s}
+                  </button>
+                </span>
+              ))}
+              ?
+            </div>
+          )}
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -204,13 +307,18 @@ export function HireTab() {
         {err && (
           <div className="rounded border border-rose-900 bg-rose-950/40 p-3 text-sm text-rose-200">{err}</div>
         )}
-        {result && (
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-4 text-sm">
-            <div className="text-xs text-zinc-500">
-              {result.candidates.length} candidate{result.candidates.length === 1 ? "" : "s"} · ranked in{" "}
-              {result.elapsed_seconds.toFixed(2)}s
+        {result && result.candidates.length > 0 && (
+          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
+            <div className="flex items-baseline justify-between gap-3">
+              <div className="text-[11px] uppercase tracking-wider text-emerald-300/80">
+                Why this candidate?
+              </div>
+              <div className="text-[11px] tabular-nums text-zinc-500">
+                {result.candidates.length} candidate{result.candidates.length === 1 ? "" : "s"} · ranked in{" "}
+                {result.elapsed_seconds.toFixed(2)}s
+              </div>
             </div>
-            <div className="mt-1 text-zinc-300">{result.explanation}</div>
+            <div className="mt-2 text-sm text-emerald-100">{result.explanation}</div>
           </div>
         )}
         <ul className="space-y-3">

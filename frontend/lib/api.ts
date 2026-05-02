@@ -30,6 +30,7 @@ export type Agent = {
   agent_id: number;
   name: string | null;
   owner: string;
+  owner_ens?: string | null;
   agent_uri: string;
   block: number;
   tx_hash: string;
@@ -224,6 +225,46 @@ export type FeedbackResult = {
   error?: string | null;
 };
 
+export type SetupStatus = {
+  network: string;
+  chain_id: number;
+  signer: {
+    configured: boolean;
+    valid: boolean;
+    address: string | null;
+    balance_eth: number | null;
+    balance_warning: string | null;
+    error: string | null;
+  };
+  ens: {
+    ok: boolean;
+    rpc_url?: string;
+    error?: string;
+    rpcs?: { url: string; ok: boolean; error?: string; chain_id?: number; head_block?: number }[];
+    cache_ttl_s?: number;
+  };
+  keeperhub: {
+    api_key_configured: boolean;
+    mode: "live" | "stub";
+    network: string;
+    token: string;
+    mcp_url: string;
+    mcp_reachable: boolean;
+    mcp_error: string | null;
+  };
+  cache: {
+    agents_in_cache: number;
+    head_block: number;
+    last_scanned_block: number | null;
+    blocks_behind: number | null;
+  };
+  ready: {
+    core: boolean;
+    keeperhub_live: boolean;
+    stub_demo: boolean;
+  };
+};
+
 export type SelfStatus = {
   network: string;
   identity_registry: string;
@@ -311,6 +352,7 @@ export const api = {
     jget<{
       agent_id: number;
       owner: string;
+      owner_ens?: string | null;
       agent_uri: string;
       live_token_uri: string | null;
       block: number;
@@ -377,6 +419,13 @@ export const api = {
     feedback_uri?: string;
     feedback_payload?: Record<string, unknown>;
   }) => jget<FeedbackResult>("/api/write-feedback", { method: "POST", body: JSON.stringify(body) }),
+  // Phase 9
+  setupStatus: () => jget<SetupStatus>("/api/setup/status"),
+  capabilities: () =>
+    jget<{ total: number; capabilities: { capability: string; count: number }[] }>(
+      "/api/capabilities"
+    ),
+
   // Phase 6
   selfStatus: (params: { axl_pubkey?: string } = {}) => {
     const q = new URLSearchParams();

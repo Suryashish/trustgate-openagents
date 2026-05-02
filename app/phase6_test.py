@@ -99,7 +99,7 @@ def cmd_register(args) -> int:
     print(f"agent_uri ({len(uri)} bytes) — first 120: {uri[:120]}...")
     print(f"chain_id={rc.chain_id}  identity_registry={rc.identity_address}")
 
-    res = rc.send_register(uri, wait_for_receipt=not args.no_wait)
+    res = rc.send_register(uri, wait_for_receipt=not args.no_wait, dry_run=args.dry_run)
     print()
     print(json.dumps(res, indent=2, sort_keys=True, default=str))
     if res.get("mode") == "live" and res.get("agent_id") is not None:
@@ -158,6 +158,7 @@ def main(argv: list[str] | None = None) -> int:
     p_reg.add_argument("--api-url", help="endpoints[name=http].endpoint")
     p_reg.add_argument("--ens", help="ENS name to pin in the card")
     p_reg.add_argument("--no-wait", action="store_true", help="don't block on receipt")
+    p_reg.add_argument("--dry-run", action="store_true", help="preview calldata even if PRIVATE_KEY is set")
 
     p_ens = sub.add_parser("ens", help="reverse-resolve an address to ENS")
     p_ens.add_argument("address")

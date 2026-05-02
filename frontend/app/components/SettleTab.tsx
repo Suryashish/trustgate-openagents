@@ -7,8 +7,10 @@ import {
   type FeedbackResult,
   type SettlementResult,
   type SettlementStatus,
+  type SetupStatus,
   type AxlTopology,
 } from "@/lib/api";
+import { txUrl } from "@/lib/links";
 
 function ModeBadge({ mode, live }: { mode: string; live: boolean }) {
   return (
@@ -187,7 +189,20 @@ function SettlePanel({ status }: { status: SettlementStatus | null }) {
             {result.tx_hash && (
               <>
                 <dt className="text-zinc-500">tx</dt>
-                <dd className="break-all font-mono">{result.tx_hash}</dd>
+                <dd className="break-all font-mono">
+                  {result.tx_hash.startsWith("0xstub") ? (
+                    <span className="text-zinc-500">{result.tx_hash}</span>
+                  ) : (
+                    <a
+                      href={txUrl(null, result.tx_hash)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-emerald-300 hover:underline"
+                    >
+                      {result.tx_hash}
+                    </a>
+                  )}
+                </dd>
               </>
             )}
           </dl>
@@ -313,9 +328,10 @@ function FeedbackPanel({ status }: { status: SettlementStatus | null }) {
           {result.mode === "live" && result.tx_hash && (
             <div className="mt-2">
               <a
-                href={`https://sepolia.basescan.org/tx/${result.tx_hash}`}
+                href={txUrl(null, result.tx_hash)}
                 className="break-all font-mono text-emerald-300 underline"
                 target="_blank"
+                rel="noreferrer"
               >
                 {result.tx_hash}
               </a>
@@ -552,6 +568,139 @@ function CompleteHirePanel() {
   );
 }
 
+function KeeperHubReadinessPanel() {
+  const [setup, setSetup] = useState<SetupStatus | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function load() {
+    setRefreshing(true);
+    setErr(null);
+    try {
+      const s = await api.setupStatus();
+      setSetup(s);
+    } catch (e) {
+      setErr((e as Error).message || String(e));
+    } finally {
+      setRefreshing(false);
+    }
+  }
+  useEffect(() => {
+    load();
+  }, []);
+
+  if (!setup) {
+    return (
+      <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 text-xs text-zinc-500">
+        {err || "Probing KeeperHub readiness…"}
+      </section>
+    );
+  }
+
+  // Don't add visual noise once everything is green; the StatusPanel already
+  // shows the live badge. Surface this checklist only when there's something
+  // for the user to act on.
+  const everythingOk = setup.ready.keeperhub_live;
+  if (everythingOk) {
+    return (
+      <section className="rounded border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-emerald-200">
+        ✓ KeeperHub live mode ready — API key configured and{" "}
+        <code className="rounded bg-zinc-800/60 px-1">{setup.keeperhub.mcp_url}</code> reachable.
+        Settlements below will broadcast for real.
+      </section>
+    );
+  }
+
+  // Stub mode (no API key) is a fully valid demo path; show a calmer
+  // single-line callout rather than the full checklist.
+  if (!setup.keeperhub.api_key_configured) {
+    return (
+      <section className="rounded border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-200">
+        Stub mode — settlement returns a deterministic{" "}
+        <code className="rounded bg-zinc-800/60 px-1">wf_&lt;sha256&gt;</code> workflow id with full
+        audit log so the loop is demonstrable. Set{" "}
+        <code className="rounded bg-zinc-800/60 px-1">KEEPERHUB_API_KEY</code> to upgrade to live.
+      </section>
+    );
+  }
+
+  // The interesting case: API key set but MCP unreachable.
+  return (
+    <section className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-sm font-medium text-amber-200">KeeperHub: 1 step left to go live</h3>
+          <p className="mt-1 text-[11px] text-zinc-400">
+            API key is set, but neither{" "}
+            <code className="rounded bg-zinc-800/60 px-1">{setup.keeperhub.mcp_url}</code> nor the
+            public REST host is reachable. Settlements will return{" "}
+            <code className="rounded bg-zinc-800/60 px-1">live-unreachable</code> until this is fixed.
+          </p>
+        </div>
+        <button
+          onClick={load}
+          disabled={refreshing}
+          className="shrink-0 rounded bg-zinc-800/60 px-3 py-1.5 text-xs text-zinc-300 ring-1 ring-zinc-700 hover:bg-zinc-800 disabled:opacity-50"
+        >
+          {refreshing ? "Probing…" : "Probe again"}
+        </button>
+      </div>
+      <ol className="mt-3 space-y-2 text-sm">
+        <li className="flex gap-2">
+          <span className="mr-1 inline-block w-3 text-center font-mono text-emerald-400">✓</span>
+          <div className="flex-1">
+            <div className="text-zinc-200">API key configured</div>
+            <div className="text-[11px] text-zinc-500">read from .env / loaded into the API process</div>
+          </div>
+        </li>
+        <li className="flex gap-2">
+          <span className="mr-1 inline-block w-3 text-center font-mono text-amber-400">!</span>
+          <div className="flex-1">
+            <div className="text-zinc-200">Fund a KeeperHub-managed wallet (manual)</div>
+            <div className="text-[11px] text-zinc-500">
+              top up the workflow source wallet with{" "}
+              <code className="rounded bg-zinc-800/60 px-1">{setup.keeperhub.token}</code> on{" "}
+              <code className="rounded bg-zinc-800/60 px-1">{setup.keeperhub.network}</code> at{" "}
+              <a
+                href="https://app.keeperhub.com"
+                target="_blank"
+                rel="noreferrer"
+                className="text-emerald-400 hover:underline"
+              >
+                app.keeperhub.com
+              </a>{" "}
+              — there's no way to probe this from outside.
+            </div>
+          </div>
+        </li>
+        <li className="flex gap-2">
+          <span className="mr-1 inline-block w-3 text-center font-mono text-rose-400">✗</span>
+          <div className="flex-1">
+            <div className="text-zinc-200">Run / point at a KeeperHub MCP server</div>
+            <div className="text-[11px] text-zinc-500">
+              install per{" "}
+              <a
+                href="https://docs.keeperhub.com/ai-tools"
+                target="_blank"
+                rel="noreferrer"
+                className="text-emerald-400 hover:underline"
+              >
+                docs.keeperhub.com/ai-tools
+              </a>
+              , or set{" "}
+              <code className="rounded bg-zinc-800/60 px-1">KEEPERHUB_MCP_URL</code> in{" "}
+              <code className="rounded bg-zinc-800/60 px-1">.env</code> to a reachable host.
+              {setup.keeperhub.mcp_error && (
+                <span className="block mt-1 text-rose-300">{setup.keeperhub.mcp_error}</span>
+              )}
+            </div>
+          </div>
+        </li>
+      </ol>
+    </section>
+  );
+}
+
 export function SettleTab() {
   const [status, setStatus] = useState<SettlementStatus | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -572,6 +721,8 @@ export function SettleTab() {
           <div className="text-sm text-zinc-500">Loading…</div>
         )}
       </section>
+
+      <KeeperHubReadinessPanel />
 
       <CompleteHirePanel />
       <SettlePanel status={status} />

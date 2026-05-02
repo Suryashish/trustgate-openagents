@@ -417,11 +417,17 @@ class RegistryClient:
         agent_uri: str,
         *,
         from_address: str,
-        gas: int = 350_000,
+        gas: int | None = None,
         max_fee_per_gas: int | None = None,
         max_priority_fee_per_gas: int | None = None,
     ) -> dict:
-        """Build (but do not send) `register(string agentURI)`."""
+        """Build (but do not send) `register(string agentURI)`.
+
+        Gas: when `gas` is None, we run eth_estimateGas with a 30% safety
+        buffer. Storing a ~1 KB URI on chain costs ~600 k gas (SSTORE-heavy),
+        so an under-estimate causes an out-of-gas revert that still consumes
+        the full limit.
+        """
         if not agent_uri:
             raise ValueError("agent_uri is required")
         from_address = Web3.to_checksum_address(from_address)
@@ -439,6 +445,16 @@ class RegistryClient:
         except Exception:
             mfpg = max_fee_per_gas or self.w3.to_wei(2, "gwei")
             mpfg = max_priority_fee_per_gas or self.w3.to_wei(1, "gwei")
+
+        if gas is None:
+            try:
+                est = fn.estimate_gas({"from": from_address})
+                gas = int(est * 1.3)
+            except Exception:
+                # Estimate fails for the zero-address dry-run path because the
+                # ERC-721 mint reverts on `to == 0x0`. Use a conservative ceiling.
+                gas = 1_200_000
+
         return fn.build_transaction({
             "from": from_address,
             "nonce": nonce,
@@ -463,19 +479,23 @@ class RegistryClient:
         agent_uri: str,
         *,
         private_key: Optional[str] = None,
+        dry_run: bool = False,
         wait_for_receipt: bool = True,
         receipt_timeout: float = 180.0,
         **kwargs,
     ) -> dict:
         """Sign and broadcast a `register(string)` tx.
 
+        Pass `dry_run=True` to force the no-broadcast path even when
+        `PRIVATE_KEY` is set in the env — useful for previewing calldata.
+
         Returns one of:
           {"mode": "dry_run", "tx": {...}, "calldata": "0x..."}
-            — when no private_key is provided.
+            — no private_key, or `dry_run=True`.
           {"mode": "live", "tx_hash": "0x...", "agent_id": N, "block_number": N, ...}
             — when broadcast succeeded; `agent_id` parsed from the Registered log.
         """
-        pk = private_key or os.getenv("PRIVATE_KEY", "")
+        pk = "" if dry_run else (private_key or os.getenv("PRIVATE_KEY", ""))
         if not pk:
             tx = self.build_register_tx(agent_uri, from_address="0x" + "0" * 40, **kwargs)
             return {
@@ -511,8 +531,16 @@ class RegistryClient:
                 result["receipt_error"] = f"{type(e).__name__}: {e}"
         return result
 
-    def find_owned_agent_ids(self, owner: str) -> list[int]:
-        """Scan the local cache for agents whose owner == this address."""
+    def find_owned_agent_ids(self, owner: str, *, recent_block_window: int = 5000) -> list[int]:
+        """Find ids registered to this owner.
+
+        Reads the local Registered-event cache first (fast); if nothing
+        matches there, falls back to scanning the most recent
+        `recent_block_window` blocks on chain. The fallback exists because
+        a freshly-registered agent (e.g. via Phase 6 self-register) won't be
+        in the cache until the next full registry refresh, which can take
+        ~10 minutes against a public RPC.
+        """
         try:
             owner_cs = Web3.to_checksum_address(owner)
         except Exception:
@@ -525,7 +553,42 @@ class RegistryClient:
                     ids.append(int(row["agent_id"]))
             except Exception:
                 continue
-        return sorted(ids)
+        if ids:
+            return sorted(ids)
+
+        # Cache miss → cheap recent-window probe. ERC-721 Transfer is
+        # indexed on `to`, so this is a single eth_getLogs call.
+        try:
+            head = self.w3.eth.block_number
+            from_block = max(0, head - recent_block_window)
+            ev = self.identity.events.Transfer
+            logs = ev.get_logs(from_block=from_block, to_block=head, argument_filters={"to": owner_cs})
+            recent_ids = sorted({int(l.args.tokenId) for l in logs})
+            # Best-effort: persist to the cache so subsequent calls are fast
+            # and the dashboard's full-cache view picks it up too.
+            if recent_ids:
+                changed = False
+                for aid in recent_ids:
+                    key = str(aid)
+                    if key in cache.get("agents", {}):
+                        continue
+                    try:
+                        uri = self.identity.functions.tokenURI(aid).call()
+                    except Exception:
+                        uri = ""
+                    cache.setdefault("agents", {})[key] = {
+                        "agent_id": aid,
+                        "agent_uri": uri,
+                        "owner": owner_cs,
+                        "block": head,             # approximate; we didn't track the precise mint block
+                        "tx_hash": "0x" + "0" * 64,
+                    }
+                    changed = True
+                if changed:
+                    self._save_cache(cache)
+            return recent_ids
+        except Exception:
+            return []
 
     # ----- read helpers (Phase 3) -----------------------------------------
 

@@ -21,54 +21,86 @@ from typing import Optional
 
 from web3 import Web3
 
+# Comma-separated list — first reachable wins. Public mainnet RPCs are
+# rate-limited and individual ones flap, so we always try a few.
 ENS_RPC_URL = os.getenv(
     "ENS_RPC_URL",
-    # public Ethereum mainnet endpoints — first reachable wins
-    "https://eth.llamarpc.com",
+    "https://eth.llamarpc.com,https://ethereum-rpc.publicnode.com,https://cloudflare-eth.com,https://1rpc.io/eth",
 )
 ENS_CACHE_TTL = float(os.getenv("ENS_CACHE_TTL", "600"))  # 10 minutes
 
 
+def _split_rpcs(spec: str) -> list[str]:
+    return [u.strip() for u in spec.split(",") if u.strip()]
+
+
 class ENSResolver:
+    """Best-effort ENS resolver with per-call RPC failover.
+
+    web3.py's ENS module performs ~3 RPCs per `name()` call (resolver lookup
+    + forward + reverse). If the first RPC throws partway through, we retry
+    the whole lookup against the next RPC in the list. Init never fails — a
+    completely-unreachable ENS just returns None for every query.
+    """
+
     def __init__(self, rpc_url: str = ENS_RPC_URL, cache_ttl: float = ENS_CACHE_TTL):
-        self.rpc_url = rpc_url
+        self.rpc_urls = _split_rpcs(rpc_url) or ["https://eth.llamarpc.com"]
         self.cache_ttl = cache_ttl
         self._lock = threading.Lock()
-        self._w3: Optional[Web3] = None
-        self._init_error: Optional[str] = None
+        self._clients: dict[str, Web3] = {}
+        self._init_errors: dict[str, str] = {}
         self._reverse: dict[str, tuple[float, Optional[str]]] = {}
         self._forward: dict[str, tuple[float, Optional[str]]] = {}
 
-    def _client(self) -> Optional[Web3]:
+    @property
+    def rpc_url(self) -> str:
+        # Backwards-compat alias used by the API status payload + dashboard.
+        return ",".join(self.rpc_urls)
+
+    def _build(self, url: str) -> Optional[Web3]:
         with self._lock:
-            if self._w3 is not None:
-                return self._w3
-            if self._init_error is not None:
+            if url in self._clients:
+                return self._clients[url]
+            if url in self._init_errors:
                 return None
             try:
-                w3 = Web3(Web3.HTTPProvider(self.rpc_url, request_kwargs={"timeout": 6}))
-                # Touch chain_id to surface RPC errors early; ENS module is lazy.
-                _ = w3.eth.chain_id
-                self._w3 = w3
+                w3 = Web3(Web3.HTTPProvider(url, request_kwargs={"timeout": 6}))
+                _ = w3.eth.chain_id  # surface DNS / TLS errors early
+                self._clients[url] = w3
                 return w3
             except Exception as e:
-                self._init_error = f"{type(e).__name__}: {e}"
+                self._init_errors[url] = f"{type(e).__name__}: {e}"
                 return None
 
+    def _try(self, do):
+        """Walk RPCs until one succeeds. Returns (result, used_url) or (None, None)."""
+        last_err: Optional[str] = None
+        for url in self.rpc_urls:
+            w3 = self._build(url)
+            if w3 is None:
+                last_err = self._init_errors.get(url)
+                continue
+            try:
+                return do(w3), url
+            except Exception as e:
+                last_err = f"{type(e).__name__}: {e}"
+                continue
+        return None, last_err
+
     def status(self) -> dict:
-        w3 = self._client()
-        if w3 is None:
-            return {"ok": False, "rpc_url": self.rpc_url, "error": self._init_error}
-        try:
-            return {
-                "ok": True,
-                "rpc_url": self.rpc_url,
-                "chain_id": int(w3.eth.chain_id),
-                "head_block": int(w3.eth.block_number),
-                "cache_ttl_s": self.cache_ttl,
-            }
-        except Exception as e:
-            return {"ok": False, "rpc_url": self.rpc_url, "error": f"{type(e).__name__}: {e}"}
+        # Probe each URL once so the dashboard can show which are reachable.
+        per_rpc = []
+        for url in self.rpc_urls:
+            w3 = self._build(url)
+            if w3 is None:
+                per_rpc.append({"url": url, "ok": False, "error": self._init_errors.get(url)})
+                continue
+            try:
+                per_rpc.append({"url": url, "ok": True, "chain_id": int(w3.eth.chain_id), "head_block": int(w3.eth.block_number)})
+            except Exception as e:
+                per_rpc.append({"url": url, "ok": False, "error": f"{type(e).__name__}: {e}"})
+        any_up = any(e["ok"] for e in per_rpc)
+        return {"ok": any_up, "rpc_url": self.rpc_url, "rpcs": per_rpc, "cache_ttl_s": self.cache_ttl}
 
     # ----- reverse: address -> ENS name ------------------------------------
 
@@ -83,17 +115,10 @@ class ENSResolver:
         cached = self._reverse.get(address)
         if cached and (now - cached[0]) < self.cache_ttl:
             return cached[1]
-        w3 = self._client()
-        if w3 is None:
-            return None
-        try:
-            name = w3.ens.name(address)  # type: ignore[union-attr]
-        except Exception:
-            name = None
-        # Verify forward resolution matches (canonical ENS pattern). web3.py's
-        # `name()` already does this, but only when both addr and name resolve.
-        self._reverse[address] = (now, name or None)
-        return name or None
+        result, _used = self._try(lambda w3: w3.ens.name(address))  # type: ignore[union-attr]
+        name = result if isinstance(result, str) and result else None
+        self._reverse[address] = (now, name)
+        return name
 
     # ----- forward: name -> address ----------------------------------------
 
@@ -104,14 +129,8 @@ class ENSResolver:
         cached = self._forward.get(name)
         if cached and (now - cached[0]) < self.cache_ttl:
             return cached[1]
-        w3 = self._client()
-        if w3 is None:
-            return None
-        try:
-            addr = w3.ens.address(name)  # type: ignore[union-attr]
-        except Exception:
-            addr = None
-        addr_str = Web3.to_checksum_address(addr) if addr else None
+        result, _used = self._try(lambda w3: w3.ens.address(name))  # type: ignore[union-attr]
+        addr_str = Web3.to_checksum_address(result) if result else None
         self._forward[name] = (now, addr_str)
         return addr_str
 

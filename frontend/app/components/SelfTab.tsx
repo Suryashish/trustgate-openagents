@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, type SelfStatus, type SelfRegisterResult, type EnsResolveResult } from "@/lib/api";
+import { api, API_BASE, type SelfStatus, type SelfRegisterResult, type EnsResolveResult } from "@/lib/api";
+import { addressUrl, agentUrl, txUrl } from "@/lib/links";
 
 function ModeBadge({ live, label }: { live: boolean; label: string }) {
   return (
@@ -53,6 +54,33 @@ export function SelfTab() {
 
   useEffect(() => {
     refresh();
+  }, []);
+
+  // Auto-fill the AXL pubkey from n1's topology and the HTTP endpoint from
+  // the API base, so users registering the local stack as TrustGate don't
+  // have to know any of these values up-front. We only fill when the field
+  // is empty — never overwrite user typing.
+  useEffect(() => {
+    let cancelled = false;
+    if (!axlPubkey) {
+      api
+        .axlTopology(9002)
+        .then((t) => {
+          if (cancelled) return;
+          const pk = t.topology?.our_public_key;
+          if (pk) setAxlPubkey((cur) => (cur ? cur : pk));
+        })
+        .catch(() => {});
+    }
+    if (!apiUrl) {
+      // The dashboard knows where the API is — the same value it fetches
+      // from. Pre-fill that as the published HTTP endpoint.
+      setApiUrl((cur) => (cur ? cur : API_BASE));
+    }
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onRegister = async () => {
@@ -116,8 +144,15 @@ export function SelfTab() {
               {status.signer.address && (
                 <div className="flex justify-between">
                   <dt className="text-xs text-zinc-500">address</dt>
-                  <dd className="break-all font-mono text-[11px] text-emerald-300">
-                    {status.signer.address}
+                  <dd>
+                    <a
+                      href={addressUrl({ chain_id: status.chain_id }, status.signer.address)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="break-all font-mono text-[11px] text-emerald-300 hover:underline"
+                    >
+                      {status.signer.address}
+                    </a>
                   </dd>
                 </div>
               )}
@@ -148,7 +183,19 @@ export function SelfTab() {
                 <dd className="text-zinc-200">
                   {status.owned_agent_ids.length === 0
                     ? "(none on this network)"
-                    : `#${status.owned_agent_ids.join(", #")}`}
+                    : status.owned_agent_ids.map((id, i) => (
+                        <span key={id}>
+                          {i > 0 && ", "}
+                          <a
+                            href={agentUrl(id)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-emerald-300 hover:underline"
+                          >
+                            #{id}
+                          </a>
+                        </span>
+                      ))}
                 </dd>
               </div>
             </dl>
@@ -205,7 +252,7 @@ export function SelfTab() {
             <input
               value={axlPubkey}
               onChange={(e) => setAxlPubkey(e.target.value)}
-              placeholder="paste from `bash scripts/start_axl_nodes.sh`"
+              placeholder="auto-detected from n1 topology when AXL is up"
               className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950/40 px-2 py-1.5 font-mono text-[12px] text-zinc-200"
             />
           </label>
@@ -214,7 +261,7 @@ export function SelfTab() {
             <input
               value={apiUrl}
               onChange={(e) => setApiUrl(e.target.value)}
-              placeholder="e.g. https://trustgate.example.com"
+              placeholder="defaults to the API base (override for a public hostname)"
               className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950/40 px-2 py-1.5 font-mono text-[12px] text-zinc-200"
             />
           </label>
@@ -252,7 +299,7 @@ export function SelfTab() {
               <p className="text-zinc-300">
                 tx:{" "}
                 <a
-                  href={`https://sepolia.basescan.org/tx/${registerResult.tx_hash}`}
+                  href={txUrl({ chain_id: status?.chain_id ?? 84532 }, registerResult.tx_hash)}
                   target="_blank"
                   rel="noreferrer"
                   className="break-all font-mono text-emerald-300 hover:underline"
@@ -260,9 +307,14 @@ export function SelfTab() {
                   {registerResult.tx_hash}
                 </a>
                 {registerResult.agent_id !== undefined && (
-                  <span className="ml-2 rounded bg-emerald-500/20 px-2 py-0.5 text-emerald-200 ring-1 ring-emerald-400/30">
+                  <a
+                    href={agentUrl(registerResult.agent_id)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="ml-2 rounded bg-emerald-500/20 px-2 py-0.5 text-emerald-200 ring-1 ring-emerald-400/30 hover:bg-emerald-500/30"
+                  >
                     new agent #{registerResult.agent_id}
-                  </span>
+                  </a>
                 )}
               </p>
             )}

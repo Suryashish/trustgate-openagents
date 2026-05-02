@@ -1,6 +1,9 @@
 "use client";
 
-import type { CacheStatus, NetworkInfo } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { api, type CacheStatus, type CompleteHireResult, type NetworkInfo } from "@/lib/api";
+import { addressUrl } from "@/lib/links";
+import { SetupWizard } from "./SetupWizard";
 
 function Stat({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
   return (
@@ -12,9 +15,232 @@ function Stat({ label, value, hint }: { label: string; value: React.ReactNode; h
   );
 }
 
-function CodeAddr({ children }: { children: React.ReactNode }) {
+const STAGES = [
+  { key: "discover", label: "Discover" },
+  { key: "rank", label: "Rank" },
+  { key: "deliver", label: "Deliver" },
+  { key: "settle", label: "Settle" },
+  { key: "feedback", label: "Feedback" },
+] as const;
+
+type StageKey = (typeof STAGES)[number]["key"];
+type StageState = "idle" | "active" | "ok" | "fail" | "skipped";
+
+function deriveStages(r: CompleteHireResult | null): Record<StageKey, StageState> {
+  if (!r) {
+    return { discover: "idle", rank: "idle", deliver: "idle", settle: "idle", feedback: "idle" };
+  }
+  const hasCandidates = (r.hire?.candidates?.length ?? 0) > 0;
+  const delivered = r.hire?.winner_index !== null && r.hire?.winner_index !== undefined;
+  const settle: StageState =
+    !r.settlement
+      ? "skipped"
+      : r.settlement.status === "executed"
+        ? "ok"
+        : r.settlement.status === "pending"
+          ? "active"
+          : "fail";
+  const fb = r.feedback;
+  const feedback: StageState =
+    !fb
+      ? "skipped"
+      : fb.mode === "skipped"
+        ? "skipped"
+        : fb.mode === "error"
+          ? "fail"
+          : "ok";
+  return {
+    discover: hasCandidates ? "ok" : "fail",
+    rank: hasCandidates ? "ok" : "fail",
+    deliver: delivered ? "ok" : "fail",
+    settle,
+    feedback,
+  };
+}
+
+function StagePill({ state, label }: { state: StageState; label: string }) {
+  const styles: Record<StageState, string> = {
+    idle: "border-zinc-800 bg-zinc-900/40 text-zinc-500",
+    active: "border-amber-400/30 bg-amber-500/10 text-amber-300 animate-pulse",
+    ok: "border-emerald-400/30 bg-emerald-500/15 text-emerald-300",
+    fail: "border-rose-400/30 bg-rose-500/15 text-rose-300",
+    skipped: "border-zinc-700 bg-zinc-800/40 text-zinc-500",
+  };
+  const glyph = { idle: "·", active: "…", ok: "✓", fail: "✗", skipped: "—" }[state];
   return (
-    <code className="break-all font-mono text-[11px] text-emerald-300">{children}</code>
+    <div className={`flex items-center gap-2 rounded border px-2 py-1 text-xs ${styles[state]}`}>
+      <span className="font-mono">{glyph}</span>
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function SampleHirePanel() {
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState<CompleteHireResult | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [stages, setStages] = useState<Record<StageKey, StageState>>(() => deriveStages(null));
+  const [workersOnline, setWorkersOnline] = useState<{ b: boolean; c: boolean }>({ b: false, c: false });
+
+  // Probe whether the two phase4 workers are up — if not, the sample hire
+  // can't deliver.
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      api.axlTopology(9012).then((t) => !!t.topology).catch(() => false),
+      api.axlTopology(9022).then((t) => !!t.topology).catch(() => false),
+    ]).then(([b, c]) => {
+      if (cancelled) return;
+      setWorkersOnline({ b, c });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function run() {
+    setRunning(true);
+    setErr(null);
+    setResult(null);
+    setStages({ discover: "active", rank: "idle", deliver: "idle", settle: "idle", feedback: "idle" });
+
+    try {
+      const [topoB, topoC] = await Promise.all([api.axlTopology(9012), api.axlTopology(9022)]);
+      if (!topoB.topology || !topoC.topology) {
+        throw new Error(
+          "worker-b / worker-c not reachable. Run `bash scripts/run.sh` to bring up the full stack."
+        );
+      }
+      setStages((s) => ({ ...s, discover: "ok", rank: "active" }));
+
+      const bPk = topoB.topology.our_public_key;
+      const cPk = topoC.topology.our_public_key;
+      setStages((s) => ({ ...s, rank: "ok", deliver: "active" }));
+
+      const r = await api.completeHire({
+        capability: "phase8-overview-demo",
+        service: "uppercase_text",
+        input: "trustgate sample hire — overview tab",
+        candidates: [],
+        extra_candidates: [
+          {
+            agent_id: -1,
+            name: "worker-b",
+            axl_pubkey: bPk,
+            endpoints: [{ name: "axl", endpoint: bPk }],
+          },
+          {
+            agent_id: -1,
+            name: "worker-c",
+            axl_pubkey: cPk,
+            endpoints: [{ name: "axl", endpoint: cPk }],
+          },
+        ] as never,
+        a2a_timeout: 5,
+        payment_amount_usdc: 0.1,
+        feedback_score: 0.95,
+        feedback_tags: ["trustgate", "phase8-demo"],
+        write_feedback_onchain: false,
+        force_stub_settlement: true,
+      });
+      setResult(r);
+      setStages(deriveStages(r));
+    } catch (e) {
+      setErr((e as Error).message || String(e));
+      setStages((s) => {
+        const next = { ...s };
+        for (const k of Object.keys(next) as StageKey[]) {
+          if (next[k] === "active" || next[k] === "idle") next[k] = "fail";
+        }
+        return next;
+      });
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  const replyText = (() => {
+    const r = result?.hire?.final_reply;
+    if (!r) return null;
+    const inner = (r as { result?: unknown; reply?: unknown }).result ?? (r as { reply?: unknown }).reply;
+    return typeof inner === "string" ? inner : JSON.stringify(inner ?? r, null, 2);
+  })();
+
+  return (
+    <section className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-medium text-emerald-200">Run a sample hire</h3>
+          <p className="mt-1 text-xs text-zinc-400">
+            One click drives the whole loop against the local workers — no wallet, no gas, no setup
+            beyond <code className="rounded bg-zinc-800 px-1">bash scripts/run.sh</code>.
+          </p>
+        </div>
+        <button
+          onClick={run}
+          disabled={running || !workersOnline.b || !workersOnline.c}
+          title={
+            !workersOnline.b || !workersOnline.c
+              ? "Need worker-b (port 9012) and worker-c (port 9022) online"
+              : "Run discover → deliver → settle → feedback against the local workers"
+          }
+          className="rounded bg-emerald-500/30 px-4 py-2 text-sm font-medium text-emerald-50 ring-1 ring-emerald-400/40 hover:bg-emerald-500/40 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {running ? "Running…" : "Run a sample hire"}
+        </button>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {STAGES.map((s) => (
+          <StagePill key={s.key} state={stages[s.key]} label={s.label} />
+        ))}
+      </div>
+
+      {!workersOnline.b || !workersOnline.c ? (
+        <p className="mt-3 text-[11px] text-amber-300">
+          Workers offline — run <code className="rounded bg-zinc-800 px-1">bash scripts/run.sh</code>{" "}
+          to bring up the full stack.
+        </p>
+      ) : null}
+
+      {err && (
+        <pre className="mt-3 whitespace-pre-wrap rounded border border-rose-900 bg-rose-950/40 p-3 text-xs text-rose-200">
+          {err}
+        </pre>
+      )}
+
+      {result && replyText !== null && (
+        <div className="mt-4 space-y-2 text-xs">
+          <div className="text-zinc-400">
+            Winner: <span className="text-zinc-100">worker-{result.hire?.winner_index === 0 ? "b" : "c"}</span>{" "}
+            · settled in <span className="tabular-nums text-zinc-100">{result.settlement?.elapsed_seconds?.toFixed(2) ?? "—"}s</span>{" "}
+            · workflow{" "}
+            <code className="rounded bg-zinc-800 px-1 font-mono text-emerald-300">
+              {result.settlement?.workflow_id || "(none)"}
+            </code>
+          </div>
+          <div>
+            <div className="text-zinc-500">Worker reply</div>
+            <pre className="mt-1 overflow-auto rounded bg-zinc-950/60 p-2 text-zinc-200 ring-1 ring-zinc-800">
+              {replyText}
+            </pre>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function CodeAddrLink({ addr, href }: { addr: string; href: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="break-all font-mono text-[11px] text-emerald-300 hover:underline"
+    >
+      {addr}
+    </a>
   );
 }
 
@@ -67,6 +293,10 @@ export function OverviewTab({
         </div>
       </section>
 
+      <SetupWizard />
+
+      <SampleHirePanel />
+
       <section className="grid gap-3 md:grid-cols-2">
         <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
           <h3 className="mb-3 text-sm font-medium text-zinc-400">The five-stage hiring loop</h3>
@@ -106,13 +336,19 @@ export function OverviewTab({
               <div>
                 <dt className="text-xs text-zinc-500">Identity Registry</dt>
                 <dd>
-                  <CodeAddr>{network.identity_registry}</CodeAddr>
+                  <CodeAddrLink
+                    addr={network.identity_registry}
+                    href={addressUrl(network, network.identity_registry)}
+                  />
                 </dd>
               </div>
               <div>
                 <dt className="text-xs text-zinc-500">Reputation Registry</dt>
                 <dd>
-                  <CodeAddr>{network.reputation_registry}</CodeAddr>
+                  <CodeAddrLink
+                    addr={network.reputation_registry}
+                    href={addressUrl(network, network.reputation_registry)}
+                  />
                 </dd>
               </div>
               <div>
@@ -147,6 +383,11 @@ export function OverviewTab({
             <span className="text-zinc-200">Settle</span> · Phase 5 — drive the full
             hire → A2A → settle → write_feedback pipeline. Also exposes settle_payment
             and giveFeedback as separate panels with stub / dry-run modes.
+          </li>
+          <li>
+            <span className="text-zinc-200">Self</span> · Phase 6/7 — TrustGate is itself
+            registered as an ERC-8004 agent. The Self tab shows the signer, the published
+            card, and lets you re-broadcast registration / look up ENS names.
           </li>
         </ul>
       </section>

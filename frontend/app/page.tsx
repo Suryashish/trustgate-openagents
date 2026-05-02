@@ -89,7 +89,7 @@ export default function Home() {
         ) : tab === "overview" ? (
           <OverviewTab network={network} cache={cache} />
         ) : tab === "agents" ? (
-          <AgentsTab />
+          <AgentsTab network={network} />
         ) : tab === "hire" ? (
           <HireTab />
         ) : tab === "axl" ? (

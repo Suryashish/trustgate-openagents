@@ -1,11 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, type Agent, type FeedbackRow, type Reputation } from "@/lib/api";
-
-function shortAddr(a: string) {
-  return a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "";
-}
+import { api, type Agent, type FeedbackRow, type NetworkInfo, type Reputation } from "@/lib/api";
+import { addressUrl, agentUrl, shortAddress, txUrl } from "@/lib/links";
 
 function CapPill({ children }: { children: React.ReactNode }) {
   return (
@@ -19,10 +16,12 @@ function AgentRow({
   a,
   onSelect,
   selected,
+  network,
 }: {
   a: Agent;
   onSelect: (id: number) => void;
   selected: boolean;
+  network: NetworkInfo | null;
 }) {
   return (
     <li
@@ -39,7 +38,23 @@ function AgentRow({
           <span className="text-zinc-500">#{a.agent_id}</span>{" "}
           <span>{a.name || "(no name)"}</span>
         </div>
-        <span className="font-mono text-[10px] text-zinc-500">{shortAddr(a.owner)}</span>
+        <a
+          href={addressUrl(network, a.owner)}
+          target="_blank"
+          rel="noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="text-[10px] text-zinc-500 hover:text-emerald-300 hover:underline"
+          title={a.owner}
+        >
+          {a.owner_ens ? (
+            <span>
+              <span className="text-emerald-300/80">{a.owner_ens}</span>
+              <span className="ml-1 font-mono text-zinc-600">{shortAddress(a.owner)}</span>
+            </span>
+          ) : (
+            <span className="font-mono">{shortAddress(a.owner)}</span>
+          )}
+        </a>
       </div>
       <div className="mt-1 flex flex-wrap gap-1">
         {a.capabilities.slice(0, 6).map((c) => (
@@ -53,7 +68,7 @@ function AgentRow({
   );
 }
 
-function AgentDetail({ id }: { id: number }) {
+function AgentDetail({ id, network }: { id: number; network: NetworkInfo | null }) {
   type Detail = Awaited<ReturnType<typeof api.agent>> & {
     feedback?: FeedbackRow[];
   };
@@ -81,7 +96,17 @@ function AgentDetail({ id }: { id: number }) {
   return (
     <div className="space-y-5 text-sm">
       <div>
-        <div className="text-xs uppercase tracking-wider text-zinc-500">Agent #{d.agent_id}</div>
+        <div className="flex items-baseline justify-between gap-2">
+          <div className="text-xs uppercase tracking-wider text-zinc-500">Agent #{d.agent_id}</div>
+          <a
+            href={agentUrl(d.agent_id)}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[11px] text-emerald-300 hover:underline"
+          >
+            view on 8004scan ↗
+          </a>
+        </div>
         <div className="text-xl font-semibold">{card?.name || "(no name)"}</div>
         {card?.description && (
           <p className="mt-1 max-w-3xl text-zinc-300">{String(card.description)}</p>
@@ -128,7 +153,16 @@ function AgentDetail({ id }: { id: number }) {
                     className={r.revoked ? "text-zinc-600 line-through" : "text-zinc-300"}
                   >
                     <td className="px-2 py-1 tabular-nums">{r.index}</td>
-                    <td className="px-2 py-1 font-mono">{shortAddr(r.client)}</td>
+                    <td className="px-2 py-1 font-mono">
+                      <a
+                        href={addressUrl(network, r.client)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="hover:text-emerald-300 hover:underline"
+                      >
+                        {shortAddress(r.client)}
+                      </a>
+                    </td>
                     <td className="px-2 py-1 tabular-nums">{r.score_raw}</td>
                     <td className="px-2 py-1 tabular-nums">{r.trust_level}</td>
                     <td className="px-2 py-1">{r.tag}</td>
@@ -177,7 +211,19 @@ function AgentDetail({ id }: { id: number }) {
         <dl className="grid grid-cols-1 gap-1 text-xs sm:grid-cols-2">
           <div>
             <dt className="text-zinc-500">Owner</dt>
-            <dd className="font-mono">{d.owner}</dd>
+            <dd>
+              {d.owner_ens && (
+                <div className="text-emerald-300">{d.owner_ens}</div>
+              )}
+              <a
+                href={addressUrl(network, d.owner)}
+                target="_blank"
+                rel="noreferrer"
+                className="break-all font-mono text-emerald-300/80 hover:underline"
+              >
+                {d.owner}
+              </a>
+            </dd>
           </div>
           <div>
             <dt className="text-zinc-500">Block</dt>
@@ -185,7 +231,20 @@ function AgentDetail({ id }: { id: number }) {
           </div>
           <div className="sm:col-span-2">
             <dt className="text-zinc-500">tx</dt>
-            <dd className="break-all font-mono">{d.tx_hash}</dd>
+            <dd>
+              {d.tx_hash && d.tx_hash !== "0x" + "0".repeat(64) ? (
+                <a
+                  href={txUrl(network, d.tx_hash)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="break-all font-mono text-emerald-300 hover:underline"
+                >
+                  {d.tx_hash}
+                </a>
+              ) : (
+                <span className="font-mono text-zinc-500">{d.tx_hash}</span>
+              )}
+            </dd>
           </div>
           <div className="sm:col-span-2">
             <dt className="text-zinc-500">agentURI (registered)</dt>
@@ -207,7 +266,7 @@ function AgentDetail({ id }: { id: number }) {
   );
 }
 
-export function AgentsTab() {
+export function AgentsTab({ network }: { network: NetworkInfo | null }) {
   const [capability, setCapability] = useState("");
   const [pendingCap, setPendingCap] = useState("");
   const [activeOnly, setActiveOnly] = useState(true);
@@ -301,6 +360,7 @@ export function AgentsTab() {
               a={a}
               onSelect={setSelected}
               selected={selected === a.agent_id}
+              network={network}
             />
           ))}
           {!loading && agents.length === 0 && (
@@ -311,7 +371,7 @@ export function AgentsTab() {
 
       <div className="rounded-lg border border-zinc-800 bg-zinc-900/20 p-4">
         {selected != null ? (
-          <AgentDetail id={selected} />
+          <AgentDetail id={selected} network={network} />
         ) : (
           <div className="text-sm text-zinc-500">Select an agent to inspect.</div>
         )}
