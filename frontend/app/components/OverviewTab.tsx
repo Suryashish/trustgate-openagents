@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api, type CacheStatus, type CompleteHireResult, type NetworkInfo } from "@/lib/api";
 import { addressUrl } from "@/lib/links";
 import { SetupWizard } from "./SetupWizard";
+import { TabHeader } from "./TabHeader";
 import { Tooltip } from "./Tooltip";
 
 function Stat({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
@@ -185,7 +186,7 @@ function SampleHirePanel() {
               ? "Need worker-b (port 9012) and worker-c (port 9022) online"
               : "Run discover → deliver → settle → feedback against the local workers"
           }
-          className="rounded bg-bh-blue-bright/25 px-4 py-2 text-sm font-medium text-bh-blue ring-1 ring-bh-blue-bright/40 hover:bg-bh-blue-bright/40 disabled:cursor-not-allowed disabled:opacity-40"
+          className="bh-btn bg-bh-ink text-bh-canvas px-5 py-2.5 text-sm font-medium tracking-tight disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
         >
           {running ? "Running…" : "Run a sample hire"}
         </button>
@@ -263,9 +264,16 @@ export function OverviewTab({
       : null;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
+      <TabHeader
+        eyebrow="01 · overview"
+        title="Pipeline at a glance"
+        subtitle="Live state of the Base Sepolia registry, the local AXL mesh, and TrustGate's own readiness — plus a one-click sample hire to verify the full loop."
+        glyph="square"
+      />
+
       <section>
-        <h2 className="mb-3 text-sm font-medium text-bh-mute">Pipeline at a glance</h2>
+        <h2 className="mb-3 text-sm font-medium text-bh-mute">At a glance</h2>
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
           <Stat
             label="Network"

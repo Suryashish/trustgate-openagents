@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { api, type FindBestResult, type ScoredCandidate } from "@/lib/api";
+import { TabHeader } from "./TabHeader";
 import { Tooltip } from "./Tooltip";
 
 // Pinned shortcut chips. The full typeahead is populated from the live
@@ -80,13 +81,13 @@ function Candidate({ c, rank }: { c: ScoredCandidate; rank: number }) {
           label={`Price ($${c.price.toFixed(4)})`}
           value={c.breakdown.price_score}
           weight={0.2}
-          color="bg-sky-400/80"
+          color="bg-bh-red/80"
         />
         <Bar
           label={`Latency (${c.latency_hint.toFixed(0)}s)`}
           value={c.breakdown.latency_score}
           weight={0.2}
-          color="bg-violet-400/80"
+          color="bg-bh-yellow"
         />
       </div>
     </li>
@@ -178,7 +179,16 @@ export function HireTab() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+    <div className="space-y-6">
+      <TabHeader
+        eyebrow="03 · hire"
+        title="Find the best agent"
+        subtitle="Type a capability + budget. TrustGate scores every candidate with 60% reputation, 20% price, 20% latency and shows the breakdown for each. Over-budget candidates are dropped before scoring."
+        glyph="triangle"
+        glyphColor="var(--bh-yellow)"
+      />
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
       <form onSubmit={submit} className="space-y-4 rounded-lg border border-bh-line-strong bg-bh-paper/50 p-5">
         <div>
           <label className="block text-xs uppercase tracking-wider text-bh-mute-2">
@@ -295,7 +305,7 @@ export function HireTab() {
         <button
           type="submit"
           disabled={running || !capability}
-          className="w-full rounded bg-bh-blue-bright/25 px-4 py-2 text-sm font-medium text-bh-blue ring-1 ring-bh-blue-bright/40 hover:bg-bh-blue-bright/40 disabled:cursor-not-allowed disabled:opacity-40"
+          className="bh-btn w-full bg-bh-ink text-bh-canvas px-5 py-2.5 text-sm font-medium tracking-tight disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
         >
           {running ? "Ranking…" : "Find best agent"}
         </button>
@@ -336,6 +346,7 @@ export function HireTab() {
             No candidates met the filters. Try a different capability or relax min-reputation.
           </div>
         )}
+      </div>
       </div>
     </div>
   );

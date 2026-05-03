@@ -13,6 +13,7 @@ import {
   type AxlTopology,
 } from "@/lib/api";
 import { txUrl } from "@/lib/links";
+import { TabHeader } from "./TabHeader";
 
 function ModeBadge({ mode, live }: { mode: string; live: boolean }) {
   return (
@@ -795,9 +796,17 @@ export function SettleTab() {
   }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      <TabHeader
+        eyebrow="05 · settle"
+        title="Pay the agent. Record the feedback."
+        subtitle="The closing two stages of the loop. KeeperHub settles the payment via /api/execute/transfer; ReputationRegistry.giveFeedback writes the score back on-chain."
+        glyph="circle"
+        glyphColor="var(--bh-red)"
+      />
+
       <section>
-        <h2 className="mb-3 text-sm font-medium text-bh-mute">Phase 5 · settle &amp; record</h2>
+        <h2 className="mb-3 text-sm font-medium text-bh-mute">Status</h2>
         {err ? (
           <div className="rounded border border-bh-red/40 bg-bh-red/10 p-3 text-xs text-bh-red">{err}</div>
         ) : status ? (

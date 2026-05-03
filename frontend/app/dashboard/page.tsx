@@ -58,7 +58,7 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div className="relative flex flex-1 flex-col bg-bh-canvas text-bh-ink">
+    <div className="relative flex min-h-screen flex-1 flex-col bg-bh-canvas text-bh-ink">
       {/* Subtle paper grain over the whole app — gives the same texture as the landing */}
       <div className="pointer-events-none absolute inset-0 bh-grain opacity-60" aria-hidden />
 

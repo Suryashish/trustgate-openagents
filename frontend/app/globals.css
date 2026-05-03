@@ -53,17 +53,17 @@
   --color-bh-yellow-soft: var(--bh-yellow-soft);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* TrustGate ships a single Bauhaus light theme. We intentionally don't honour
+   prefers-color-scheme: dark — the Bauhaus palette is the brand. */
+
+html {
+  background: var(--bh-canvas);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bh-canvas);
+  color: var(--bh-ink);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
 /* ───────── Bauhaus textures ───────── */

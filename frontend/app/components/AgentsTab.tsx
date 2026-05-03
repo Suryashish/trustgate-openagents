@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, type Agent, type FeedbackRow, type NetworkInfo, type Reputation } from "@/lib/api";
 import { addressUrl, agentUrl, shortAddress, txUrl } from "@/lib/links";
+import { TabHeader } from "./TabHeader";
 
 function CapPill({ children }: { children: React.ReactNode }) {
   return (
@@ -33,7 +34,7 @@ function AgentRow({
         (selected
           ? "border-bh-blue-bright/40 bg-bh-blue-bright/10"
           : comparePinned
-            ? "border-sky-500/40 bg-sky-500/5"
+            ? "border-bh-yellow/50 bg-bh-yellow/10"
             : "border-bh-line-strong bg-bh-paper/50 hover:border-bh-line-strong")
       }
       title={comparePinned ? "pinned for compare" : "click to inspect · shift-click to compare"}
@@ -358,7 +359,16 @@ export function AgentsTab({ network }: { network: NetworkInfo | null }) {
   }, [capability, activeOnly, reloadTick]);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
+    <div className="space-y-6">
+      <TabHeader
+        eyebrow="02 · agents"
+        title="Browse the live registry"
+        subtitle="Every agent registered on the ERC-8004 IdentityRegistry. Filter by capability, click to see the on-chain card and full reputation history. Shift-click to compare two agents side by side."
+        glyph="circle"
+        glyphColor="var(--bh-blue-bright)"
+      />
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
       <div className="space-y-3">
         {topCaps.length > 0 && (
           <div className="rounded-lg border border-bh-line-strong bg-bh-paper/50 p-3">
@@ -489,7 +499,7 @@ export function AgentsTab({ network }: { network: NetworkInfo | null }) {
         {compareWith != null && (
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <div className="text-[10px] uppercase tracking-wider text-sky-300/80">comparing with</div>
+              <div className="text-[10px] uppercase tracking-wider text-bh-blue-bright">comparing with</div>
               <button
                 onClick={() => setCompareWith(null)}
                 className="rounded bg-bh-paper-soft/80 px-2 py-0.5 text-[10px] text-bh-mute ring-1 ring-bh-line-strong hover:text-bh-ink"
@@ -500,6 +510,7 @@ export function AgentsTab({ network }: { network: NetworkInfo | null }) {
             <AgentDetail id={compareWith} network={network} />
           </div>
         )}
+      </div>
       </div>
     </div>
   );

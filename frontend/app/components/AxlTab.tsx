@@ -8,6 +8,7 @@ import {
   type AxlTopology,
   type HireResult,
 } from "@/lib/api";
+import { TabHeader } from "./TabHeader";
 import { Tooltip } from "./Tooltip";
 
 function shortPk(pk: string) {
@@ -202,6 +203,14 @@ export function AxlTab() {
 
   return (
     <div className="space-y-6">
+      <TabHeader
+        eyebrow="04 · axl bridge"
+        title="The peer-to-peer mesh"
+        subtitle="Three local Gensyn AXL nodes peered together. n1 is TrustGate's outbound. n2 + n3 host the workers. Watch a hire-with-fallback flow run end-to-end across the mesh."
+        glyph="square"
+        glyphColor="var(--bh-blue-bright)"
+      />
+
       <section className="rounded-lg border border-bh-line-strong bg-bh-paper/50 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">

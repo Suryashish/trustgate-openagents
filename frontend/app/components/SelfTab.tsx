@@ -12,6 +12,7 @@ import {
 } from "@/lib/api";
 import { addressUrl, agentUrl, txUrl } from "@/lib/links";
 import { useSubmitServerTx, type SubmitState } from "@/lib/tx";
+import { TabHeader } from "./TabHeader";
 
 function ModeBadge({ live, label }: { live: boolean; label: string }) {
   return (
@@ -240,6 +241,14 @@ export function SelfTab() {
 
   return (
     <div className="space-y-8">
+      <TabHeader
+        eyebrow="06 · self"
+        title="TrustGate is itself an ERC-8004 agent"
+        subtitle="The very same registry TrustGate reads from also lists TrustGate. This tab manages registration, card updates, and ENS lookups for the agent identity backing this dashboard."
+        glyph="triangle"
+        glyphColor="var(--bh-blue-bright)"
+      />
+
       {bootError && (
         <pre className="whitespace-pre-wrap rounded border border-bh-red/40 bg-bh-red/10 p-4 text-sm text-bh-red">
           {bootError}
