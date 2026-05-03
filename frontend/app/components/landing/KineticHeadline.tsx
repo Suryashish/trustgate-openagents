@@ -13,7 +13,7 @@ export function KineticHeadline() {
   }, []);
 
   return (
-    <h1 className="font-sans text-[clamp(2.6rem,6.6vw,6.4rem)] font-bold leading-[0.95] tracking-tight">
+    <h1 className="font-sans text-[clamp(2.1rem,5.2vw,5rem)] font-bold leading-[0.96] tracking-tight">
       <span className="block overflow-hidden">
         <span className="inline-block bh-anim-rise-clip">Hire an AI</span>{" "}
         <span

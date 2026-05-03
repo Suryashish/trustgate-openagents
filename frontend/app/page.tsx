@@ -292,15 +292,41 @@ function PipelineCard({
 function ShapeSquare() {
   return (
     <div className="relative h-32 w-32">
-      <div
-        className="absolute inset-0 transition-transform duration-500"
-        style={{ background: "var(--bh-red)" }}
-      />
-      <div className="absolute inset-0 -z-10 translate-x-3 translate-y-3 bg-bh-ink" />
+      {/* halo */}
       <div className="absolute -inset-6 -z-20 bg-bh-red opacity-30 blur-2xl" />
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="h-3 w-3 rounded-full bg-bh-canvas/80 bh-anim-pulse-soft" />
-      </div>
+
+      {/* offset ink shadow square */}
+      <div className="absolute inset-0 -z-10 translate-x-2.5 translate-y-2.5 bg-bh-ink" />
+
+      {/* main red square */}
+      <div className="absolute inset-0 bg-bh-red" />
+
+      {/* construction: dashed circumscribed ring */}
+      <svg
+        viewBox="0 0 100 100"
+        className="absolute -inset-3 h-[calc(100%+1.5rem)] w-[calc(100%+1.5rem)] bh-anim-spin-slow"
+        aria-hidden
+      >
+        <circle
+          cx="50"
+          cy="50"
+          r="48"
+          fill="none"
+          stroke="var(--bh-ink)"
+          strokeWidth="0.7"
+          strokeDasharray="2 6"
+          opacity="0.45"
+        />
+      </svg>
+
+      {/* inscribed yellow circle (concentric) */}
+      <div
+        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-10 w-10 rounded-full ring-2 ring-bh-ink/60"
+        style={{ background: "var(--bh-yellow)" }}
+      />
+
+      {/* center ink dot */}
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-bh-ink bh-anim-pulse-soft" />
     </div>
   );
 }
@@ -324,13 +350,56 @@ function ShapeCircle() {
 function ShapeTriangle() {
   return (
     <div className="relative h-32 w-32">
-      <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full">
-        <polygon points="50,5 95,95 5,95" fill="var(--bh-yellow)" />
-        <polygon points="50,5 95,95 5,95" fill="none" stroke="var(--bh-ink)" strokeWidth="1.4" />
+      {/* halo */}
+      <div className="absolute -inset-6 -z-20 bg-bh-yellow opacity-40 blur-2xl rounded-full" />
+
+      {/* construction: dashed circumscribed circle */}
+      <svg
+        viewBox="0 0 100 100"
+        className="absolute -inset-3 h-[calc(100%+1.5rem)] w-[calc(100%+1.5rem)] bh-anim-spin-slow"
+        aria-hidden
+      >
+        <circle
+          cx="50"
+          cy="50"
+          r="48"
+          fill="none"
+          stroke="var(--bh-ink)"
+          strokeWidth="0.7"
+          strokeDasharray="2 6"
+          opacity="0.45"
+        />
       </svg>
-      <div className="absolute -inset-6 -z-10 bg-bh-yellow opacity-40 blur-2xl rounded-full" />
-      <div className="absolute bottom-2 left-2 h-5 w-5 bg-bh-ink" />
-      <div className="absolute top-3 right-3 h-2 w-2 rounded-full bg-bh-red bh-anim-pulse-soft" />
+
+      {/* offset ink shadow + main yellow triangle */}
+      <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full" aria-hidden>
+        {/* offset shadow */}
+        <polygon points="52.5,11 96,93 9,93" fill="var(--bh-ink)" />
+        {/* main triangle */}
+        <polygon
+          points="50,8 93,90 7,90"
+          fill="var(--bh-yellow)"
+          stroke="var(--bh-ink)"
+          strokeWidth="1.2"
+        />
+        {/* median from apex to base midpoint — Bauhaus construction line */}
+        <line
+          x1="50"
+          y1="8"
+          x2="50"
+          y2="90"
+          stroke="var(--bh-ink)"
+          strokeWidth="0.6"
+          strokeDasharray="2 3"
+          opacity="0.5"
+        />
+      </svg>
+
+      {/* inscribed red circle at the triangle's centroid (~63% down) */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2 h-6 w-6 rounded-full ring-2 ring-bh-ink/60 bh-anim-pulse-soft"
+        style={{ background: "var(--bh-red)", top: "63%", transform: "translate(-50%, -50%)" }}
+      />
     </div>
   );
 }
