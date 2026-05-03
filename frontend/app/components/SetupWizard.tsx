@@ -12,12 +12,12 @@ const CROSS = "✗";
 function StatusGlyph({ s }: { s: StepState }) {
   const cls =
     s === "ok"
-      ? "text-emerald-400"
+      ? "text-bh-blue-bright"
       : s === "warn"
-        ? "text-amber-400"
+        ? "text-bh-ink"
         : s === "missing"
-          ? "text-rose-400"
-          : "text-zinc-500";
+          ? "text-bh-red"
+          : "text-bh-mute-2";
   const ch = s === "ok" ? TICK : s === "missing" ? CROSS : s === "warn" ? "!" : DASH;
   return <span className={`mr-2 inline-block w-3 text-center font-mono ${cls}`}>{ch}</span>;
 }
@@ -35,8 +35,8 @@ function Step({
     <li className="flex gap-2">
       <StatusGlyph s={state} />
       <div className="min-w-0 flex-1">
-        <div className="text-zinc-200">{title}</div>
-        {children && <div className="mt-0.5 text-[11px] text-zinc-500">{children}</div>}
+        <div className="text-bh-ink">{title}</div>
+        {children && <div className="mt-0.5 text-[11px] text-bh-mute-2">{children}</div>}
       </div>
     </li>
   );
@@ -144,33 +144,33 @@ export function SetupWizard() {
       className={
         "rounded-lg border p-5 " +
         (everythingOk
-          ? "border-emerald-500/30 bg-emerald-500/5"
+          ? "border-bh-blue-bright/40 bg-bh-blue-bright/10"
           : steps.allCoreOk
-            ? "border-amber-500/30 bg-amber-500/5"
-            : "border-rose-500/30 bg-rose-500/5")
+            ? "border-bh-yellow/50 bg-bh-yellow/10"
+            : "border-bh-red/40 bg-bh-red/5")
       }
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-sm font-medium">
-            <span className="text-zinc-200">Setup status</span>
-            <span className="ml-2 text-[11px] uppercase tracking-wider text-zinc-500">
+            <span className="text-bh-ink">Setup status</span>
+            <span className="ml-2 text-[11px] uppercase tracking-wider text-bh-mute-2">
               {everythingOk ? "live" : steps.allCoreOk ? "core" : "stub-only"}
             </span>
           </h3>
-          <p className="mt-1 text-xs text-zinc-400">{summary}</p>
+          <p className="mt-1 text-xs text-bh-mute">{summary}</p>
         </div>
         <div className="flex shrink-0 gap-2">
           <button
             onClick={load}
             disabled={verifying}
-            className="rounded bg-zinc-800/60 px-3 py-1.5 text-xs text-zinc-300 ring-1 ring-zinc-700 hover:bg-zinc-800 disabled:opacity-50"
+            className="rounded bg-bh-paper-soft/80 px-3 py-1.5 text-xs text-bh-ink-soft ring-1 ring-bh-line-strong hover:bg-bh-paper-soft disabled:opacity-50"
           >
             {verifying ? "Verifying…" : "Verify"}
           </button>
           <button
             onClick={() => setCollapsed((c) => !c)}
-            className="rounded bg-zinc-800/60 px-3 py-1.5 text-xs text-zinc-400 ring-1 ring-zinc-700 hover:text-zinc-200"
+            className="rounded bg-bh-paper-soft/80 px-3 py-1.5 text-xs text-bh-mute ring-1 ring-bh-line-strong hover:text-bh-ink"
           >
             {collapsed ? "Expand" : "Collapse"}
           </button>
@@ -178,7 +178,7 @@ export function SetupWizard() {
       </div>
 
       {err && (
-        <pre className="mt-3 whitespace-pre-wrap rounded border border-rose-900 bg-rose-950/40 p-3 text-xs text-rose-200">
+        <pre className="mt-3 whitespace-pre-wrap rounded border border-bh-red/40 bg-bh-red/10 p-3 text-xs text-bh-red">
           {err}
         </pre>
       )}
@@ -191,9 +191,9 @@ export function SetupWizard() {
             ) : (
               <>
                 copy{" "}
-                <code className="rounded bg-zinc-800 px-1">.env.example</code>
+                <code className="rounded bg-bh-paper-soft px-1">.env.example</code>
                 {" "}to{" "}
-                <code className="rounded bg-zinc-800 px-1">.env</code>
+                <code className="rounded bg-bh-paper-soft px-1">.env</code>
                 {" "}(at the repo root) and restart the API
               </>
             )}
@@ -210,13 +210,13 @@ export function SetupWizard() {
             {!status?.signer.configured ? (
               <>
                 add{" "}
-                <code className="rounded bg-zinc-800 px-1">PRIVATE_KEY=0x…</code>
+                <code className="rounded bg-bh-paper-soft px-1">PRIVATE_KEY=0x…</code>
                 {" "}to{" "}
-                <code className="rounded bg-zinc-800 px-1">.env</code>
+                <code className="rounded bg-bh-paper-soft px-1">.env</code>
                 {" "}— never reuse a mainnet key
               </>
             ) : status?.signer.error ? (
-              <span className="text-rose-300">{status.signer.error}</span>
+              <span className="text-bh-red">{status.signer.error}</span>
             ) : (
               <>chain id {status.chain_id} ({status.network})</>
             )}
@@ -237,14 +237,14 @@ export function SetupWizard() {
                   href="https://www.alchemy.com/faucets/base-sepolia"
                   target="_blank"
                   rel="noreferrer"
-                  className="text-emerald-400 hover:underline"
+                  className="text-bh-blue-bright hover:underline"
                 >
                   alchemy.com/faucets/base-sepolia
                 </a>{" "}
                 — 0.005 ETH covers ~50 register / feedback writes
               </>
             ) : steps.funded === "warn" ? (
-              <span className="text-amber-300">
+              <span className="text-bh-ink">
                 {status?.signer.balance_warning || "balance is low — consider topping up"}
               </span>
             ) : steps.funded === "ok" ? (
@@ -260,14 +260,14 @@ export function SetupWizard() {
           >
             {!status?.keeperhub.api_key_configured ? (
               <>
-                add <code className="rounded bg-zinc-800 px-1">KEEPERHUB_API_KEY=…</code>{" "}
+                add <code className="rounded bg-bh-paper-soft px-1">KEEPERHUB_API_KEY=…</code>{" "}
                 to enable live settlement. Stub mode renders a fully-instrumented
                 audit trail without a key.
               </>
             ) : (
               <>
-                live mode targets <code className="rounded bg-zinc-800 px-1">{status.keeperhub.network}</code>{" "}
-                / <code className="rounded bg-zinc-800 px-1">{status.keeperhub.token}</code>
+                live mode targets <code className="rounded bg-bh-paper-soft px-1">{status.keeperhub.network}</code>{" "}
+                / <code className="rounded bg-bh-paper-soft px-1">{status.keeperhub.token}</code>
               </>
             )}
           </Step>
@@ -286,26 +286,26 @@ export function SetupWizard() {
               <>—</>
             ) : status?.keeperhub.api_reachable ? (
               <>
-                <code className="rounded bg-zinc-800 px-1">{status.keeperhub.api_url}</code> responded
+                <code className="rounded bg-bh-paper-soft px-1">{status.keeperhub.api_url}</code> responded
               </>
             ) : (
               <>
-                <code className="rounded bg-zinc-800 px-1">{status.keeperhub.api_url}</code>
+                <code className="rounded bg-bh-paper-soft px-1">{status.keeperhub.api_url}</code>
                 {" "}isn't reachable. The backend uses{" "}
-                <code className="rounded bg-zinc-800 px-1">/api/execute/transfer</code> — see{" "}
+                <code className="rounded bg-bh-paper-soft px-1">/api/execute/transfer</code> — see{" "}
                 <a
                   href="https://docs.keeperhub.com/api/direct-execution"
                   target="_blank"
                   rel="noreferrer"
-                  className="text-emerald-400 hover:underline"
+                  className="text-bh-blue-bright hover:underline"
                 >
                   docs.keeperhub.com/api/direct-execution
                 </a>
                 . Override the host with{" "}
-                <code className="rounded bg-zinc-800 px-1">KEEPERHUB_API_URL</code> in{" "}
-                <code className="rounded bg-zinc-800 px-1">.env</code> if needed.
+                <code className="rounded bg-bh-paper-soft px-1">KEEPERHUB_API_URL</code> in{" "}
+                <code className="rounded bg-bh-paper-soft px-1">.env</code> if needed.
                 {status?.keeperhub.api_error && (
-                  <span className="block mt-1 text-rose-300">{status.keeperhub.api_error}</span>
+                  <span className="block mt-1 text-bh-red">{status.keeperhub.api_error}</span>
                 )}
               </>
             )}
@@ -330,8 +330,8 @@ function ReadyPill({ on, label, hint }: { on: boolean; label: string; hint: stri
       className={
         "rounded border px-3 py-2 text-xs " +
         (on
-          ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
-          : "border-zinc-700 bg-zinc-900/40 text-zinc-500")
+          ? "border-bh-blue-bright/40 bg-bh-blue-bright/15 text-bh-blue"
+          : "border-bh-line-strong bg-bh-paper/50 text-bh-mute-2")
       }
     >
       <div className="font-medium">

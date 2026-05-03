@@ -31,13 +31,13 @@ function Bar({ label, value, weight, color }: { label: string; value: number; we
   const widthRaw = `${Math.max(2, value * 100)}%`;
   return (
     <div className="text-[11px]">
-      <div className="flex justify-between text-zinc-500">
+      <div className="flex justify-between text-bh-mute-2">
         <span>{label}</span>
         <span className="tabular-nums">
           {value.toFixed(2)} × {weight.toFixed(2)} = {(value * weight).toFixed(3)}
         </span>
       </div>
-      <div className="mt-1 h-1.5 w-full rounded bg-zinc-800">
+      <div className="mt-1 h-1.5 w-full rounded bg-bh-paper-soft">
         <div className={`h-full rounded ${color}`} style={{ width: widthRaw }} />
       </div>
     </div>
@@ -51,20 +51,20 @@ function Candidate({ c, rank }: { c: ScoredCandidate; rank: number }) {
       className={
         "rounded-lg border p-4 " +
         (winner
-          ? "border-emerald-500/40 bg-emerald-500/5"
-          : "border-zinc-800 bg-zinc-900/40")
+          ? "border-bh-blue-bright/40 bg-bh-blue-bright/10"
+          : "border-bh-line-strong bg-bh-paper/50")
       }
     >
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-xs text-zinc-500">
+          <div className="text-xs text-bh-mute-2">
             #{rank + 1} candidate · agent #{c.agent_id}
           </div>
           <div className="text-base font-medium">{c.name || "(no name)"}</div>
         </div>
         <div className="text-right">
-          <div className="text-[10px] uppercase tracking-wider text-zinc-500">Score</div>
-          <div className={"text-2xl tabular-nums " + (winner ? "text-emerald-300" : "")}>
+          <div className="text-[10px] uppercase tracking-wider text-bh-mute-2">Score</div>
+          <div className={"text-2xl tabular-nums " + (winner ? "text-bh-blue" : "")}>
             {c.score.toFixed(3)}
           </div>
         </div>
@@ -74,7 +74,7 @@ function Candidate({ c, rank }: { c: ScoredCandidate; rank: number }) {
           label={`Reputation (${c.reputation.toFixed(3)}, ${c.feedback_count} feedback)`}
           value={c.breakdown.reputation}
           weight={0.6}
-          color="bg-emerald-400/80"
+          color="bg-bh-blue-bright/80"
         />
         <Bar
           label={`Price ($${c.price.toFixed(4)})`}
@@ -179,12 +179,12 @@ export function HireTab() {
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-      <form onSubmit={submit} className="space-y-4 rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
+      <form onSubmit={submit} className="space-y-4 rounded-lg border border-bh-line-strong bg-bh-paper/50 p-5">
         <div>
-          <label className="block text-xs uppercase tracking-wider text-zinc-500">
+          <label className="block text-xs uppercase tracking-wider text-bh-mute-2">
             Capability
             {allCaps.length > 0 && (
-              <span className="ml-2 normal-case text-[10px] text-zinc-600">
+              <span className="ml-2 normal-case text-[10px] text-bh-mute-2">
                 · {allCaps.length} unique across the cached registry
               </span>
             )}
@@ -193,7 +193,7 @@ export function HireTab() {
             list="trustgate-capabilities"
             value={capability}
             onChange={(e) => setCapability(e.target.value.trim().toLowerCase())}
-            className="mt-1 w-full rounded border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm focus:border-emerald-500 focus:outline-none"
+            className="mt-1 w-full rounded border border-bh-line-strong bg-bh-canvas px-3 py-1.5 text-sm focus:border-bh-blue-bright focus:outline-none"
           />
           <datalist id="trustgate-capabilities">
             {allCaps.map((c) => (
@@ -212,8 +212,8 @@ export function HireTab() {
                 className={
                   "rounded px-2 py-0.5 transition " +
                   (s === capability
-                    ? "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-400/30"
-                    : "bg-zinc-800 text-zinc-400 hover:text-zinc-100")
+                    ? "bg-bh-blue-bright/25 text-bh-blue ring-1 ring-bh-blue-bright/40"
+                    : "bg-bh-paper-soft text-bh-mute hover:text-bh-ink")
                 }
               >
                 {s.length > 28 ? `${s.slice(0, 28)}…` : s}
@@ -221,7 +221,7 @@ export function HireTab() {
             ))}
           </div>
           {suggestions.length > 0 && (
-            <div className="mt-2 text-[11px] text-zinc-500">
+            <div className="mt-2 text-[11px] text-bh-mute-2">
               Did you mean:{" "}
               {suggestions.map((s, i) => (
                 <span key={s}>
@@ -229,7 +229,7 @@ export function HireTab() {
                   <button
                     type="button"
                     onClick={() => setCapability(s)}
-                    className="text-emerald-400 hover:underline"
+                    className="text-bh-blue-bright hover:underline"
                   >
                     {s}
                   </button>
@@ -241,17 +241,17 @@ export function HireTab() {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs uppercase tracking-wider text-zinc-500">Budget (USDC)</label>
+            <label className="block text-xs uppercase tracking-wider text-bh-mute-2">Budget (USDC)</label>
             <input
               type="number"
               step="0.01"
               value={budget}
               onChange={(e) => setBudget(Number(e.target.value))}
-              className="mt-1 w-full rounded border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm"
+              className="mt-1 w-full rounded border border-bh-line-strong bg-bh-canvas px-3 py-1.5 text-sm"
             />
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wider text-zinc-500">Min reputation</label>
+            <label className="block text-xs uppercase tracking-wider text-bh-mute-2">Min reputation</label>
             <input
               type="number"
               step="0.01"
@@ -259,47 +259,47 @@ export function HireTab() {
               max={1}
               value={minRep}
               onChange={(e) => setMinRep(Number(e.target.value))}
-              className="mt-1 w-full rounded border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm"
+              className="mt-1 w-full rounded border border-bh-line-strong bg-bh-canvas px-3 py-1.5 text-sm"
             />
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wider text-zinc-500">Default price ($)</label>
+            <label className="block text-xs uppercase tracking-wider text-bh-mute-2">Default price ($)</label>
             <input
               type="number"
               step="0.01"
               value={defaultPrice}
               onChange={(e) => setDefaultPrice(Number(e.target.value))}
-              className="mt-1 w-full rounded border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm"
+              className="mt-1 w-full rounded border border-bh-line-strong bg-bh-canvas px-3 py-1.5 text-sm"
             />
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wider text-zinc-500">Default latency (s)</label>
+            <label className="block text-xs uppercase tracking-wider text-bh-mute-2">Default latency (s)</label>
             <input
               type="number"
               step="1"
               value={defaultLatency}
               onChange={(e) => setDefaultLatency(Number(e.target.value))}
-              className="mt-1 w-full rounded border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm"
+              className="mt-1 w-full rounded border border-bh-line-strong bg-bh-canvas px-3 py-1.5 text-sm"
             />
           </div>
         </div>
-        <label className="flex items-center gap-2 text-xs text-zinc-400">
+        <label className="flex items-center gap-2 text-xs text-bh-mute">
           <input
             type="checkbox"
             checked={requireFeedback}
             onChange={(e) => setRequireFeedback(e.target.checked)}
-            className="accent-emerald-500"
+            className="accent-bh-blue-bright"
           />
           require ≥1 feedback row
         </label>
         <button
           type="submit"
           disabled={running || !capability}
-          className="w-full rounded bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-200 ring-1 ring-emerald-400/30 hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-40"
+          className="w-full rounded bg-bh-blue-bright/25 px-4 py-2 text-sm font-medium text-bh-blue ring-1 ring-bh-blue-bright/40 hover:bg-bh-blue-bright/40 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {running ? "Ranking…" : "Find best agent"}
         </button>
-        <p className="text-[11px] text-zinc-500">
+        <p className="text-[11px] text-bh-mute-2">
           Score ={" "}
           <Tooltip text="0.60 × reputation + 0.20 × price + 0.20 × latency. Tunable per-call via the form fields above; weights default to TrustGate's blueprint values.">
             0.60·rep + 0.20·price + 0.20·latency
@@ -310,20 +310,20 @@ export function HireTab() {
 
       <div className="space-y-3">
         {err && (
-          <div className="rounded border border-rose-900 bg-rose-950/40 p-3 text-sm text-rose-200">{err}</div>
+          <div className="rounded border border-bh-red/40 bg-bh-red/10 p-3 text-sm text-bh-red">{err}</div>
         )}
         {result && result.candidates.length > 0 && (
-          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
+          <div className="rounded-lg border border-bh-blue-bright/40 bg-bh-blue-bright/10 p-4">
             <div className="flex items-baseline justify-between gap-3">
-              <div className="text-[11px] uppercase tracking-wider text-emerald-300/80">
+              <div className="text-[11px] uppercase tracking-wider text-bh-blue/80">
                 Why this candidate?
               </div>
-              <div className="text-[11px] tabular-nums text-zinc-500">
+              <div className="text-[11px] tabular-nums text-bh-mute-2">
                 {result.candidates.length} candidate{result.candidates.length === 1 ? "" : "s"} · ranked in{" "}
                 {result.elapsed_seconds.toFixed(2)}s
               </div>
             </div>
-            <div className="mt-2 text-sm text-emerald-100">{result.explanation}</div>
+            <div className="mt-2 text-sm text-bh-blue">{result.explanation}</div>
           </div>
         )}
         <ul className="space-y-3">
@@ -332,7 +332,7 @@ export function HireTab() {
           ))}
         </ul>
         {result && result.candidates.length === 0 && (
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 text-sm text-zinc-500">
+          <div className="rounded-lg border border-bh-line-strong bg-bh-paper/50 p-4 text-sm text-bh-mute-2">
             No candidates met the filters. Try a different capability or relax min-reputation.
           </div>
         )}

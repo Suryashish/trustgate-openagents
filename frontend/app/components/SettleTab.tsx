@@ -20,8 +20,8 @@ function ModeBadge({ mode, live }: { mode: string; live: boolean }) {
       className={
         "rounded px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider " +
         (live
-          ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-400/30"
-          : "bg-amber-500/15 text-amber-300 ring-1 ring-amber-400/30")
+          ? "bg-bh-blue-bright/25 text-bh-blue ring-1 ring-bh-blue-bright/40"
+          : "bg-bh-yellow/20 text-bh-ink ring-1 ring-bh-yellow/50")
       }
     >
       {mode}
@@ -32,36 +32,36 @@ function ModeBadge({ mode, live }: { mode: string; live: boolean }) {
 function StatusPanel({ status }: { status: SettlementStatus }) {
   return (
     <div className="grid gap-3 md:grid-cols-2">
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 text-sm">
+      <div className="rounded-lg border border-bh-line-strong bg-bh-paper/50 p-4 text-sm">
         <div className="flex items-center justify-between">
-          <span className="text-zinc-400">KeeperHub</span>
+          <span className="text-bh-mute">KeeperHub</span>
           <ModeBadge mode={status.keeperhub.mode} live={status.keeperhub.mode !== "stub"} />
         </div>
         <dl className="mt-2 space-y-1 text-xs">
           <div className="flex justify-between">
-            <dt className="text-zinc-500">api key</dt>
-            <dd className="text-zinc-200">{status.keeperhub.api_key_configured ? "configured" : "not set"}</dd>
+            <dt className="text-bh-mute-2">api key</dt>
+            <dd className="text-bh-ink">{status.keeperhub.api_key_configured ? "configured" : "not set"}</dd>
           </div>
           <div className="flex justify-between">
-            <dt className="text-zinc-500">network</dt>
-            <dd className="text-zinc-200">{status.keeperhub.network}</dd>
+            <dt className="text-bh-mute-2">network</dt>
+            <dd className="text-bh-ink">{status.keeperhub.network}</dd>
           </div>
           <div className="flex justify-between">
-            <dt className="text-zinc-500">token</dt>
-            <dd className="text-zinc-200">{status.keeperhub.token}</dd>
+            <dt className="text-bh-mute-2">token</dt>
+            <dd className="text-bh-ink">{status.keeperhub.token}</dd>
           </div>
         </dl>
         {status.keeperhub.mode === "stub" && (
-          <p className="mt-2 text-[11px] text-zinc-500">
-            Set <code className="rounded bg-zinc-800 px-1">KEEPERHUB_API_KEY</code> in <code>.env</code>
+          <p className="mt-2 text-[11px] text-bh-mute-2">
+            Set <code className="rounded bg-bh-paper-soft px-1">KEEPERHUB_API_KEY</code> in <code>.env</code>
             to switch to a real workflow.
           </p>
         )}
       </div>
 
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 text-sm">
+      <div className="rounded-lg border border-bh-line-strong bg-bh-paper/50 p-4 text-sm">
         <div className="flex items-center justify-between">
-          <span className="text-zinc-400">Feedback signer</span>
+          <span className="text-bh-mute">Feedback signer</span>
           <ModeBadge
             mode={status.feedback_signer.mode === "live" ? "live" : "dry-run"}
             live={status.feedback_signer.mode === "live"}
@@ -69,37 +69,37 @@ function StatusPanel({ status }: { status: SettlementStatus }) {
         </div>
         <dl className="mt-2 space-y-1 text-xs">
           <div className="flex justify-between">
-            <dt className="text-zinc-500">private key</dt>
-            <dd className="text-zinc-200">
+            <dt className="text-bh-mute-2">private key</dt>
+            <dd className="text-bh-ink">
               {status.feedback_signer.private_key_configured ? "configured" : "not set"}
             </dd>
           </div>
           <div className="flex justify-between">
-            <dt className="text-zinc-500">chain id</dt>
-            <dd className="text-zinc-200">{status.feedback_signer.chain_id}</dd>
+            <dt className="text-bh-mute-2">chain id</dt>
+            <dd className="text-bh-ink">{status.feedback_signer.chain_id}</dd>
           </div>
           {status.feedback_signer.address && (
             <div className="flex justify-between">
-              <dt className="text-zinc-500">address</dt>
-              <dd className="break-all font-mono text-emerald-300">
+              <dt className="text-bh-mute-2">address</dt>
+              <dd className="break-all font-mono text-bh-blue">
                 {status.feedback_signer.address.slice(0, 10)}…{status.feedback_signer.address.slice(-6)}
               </dd>
             </div>
           )}
           {status.feedback_signer.balance_eth !== undefined && (
             <div className="flex justify-between">
-              <dt className="text-zinc-500">balance</dt>
-              <dd className={status.feedback_signer.balance_eth < 0.0005 ? "text-amber-300" : "text-zinc-200"}>
+              <dt className="text-bh-mute-2">balance</dt>
+              <dd className={status.feedback_signer.balance_eth < 0.0005 ? "text-bh-ink" : "text-bh-ink"}>
                 {status.feedback_signer.balance_eth.toFixed(6)} ETH
               </dd>
             </div>
           )}
         </dl>
         {status.feedback_signer.mode === "dry_run" && (
-          <p className="mt-2 text-[11px] text-zinc-500">
-            Set <code className="rounded bg-zinc-800 px-1">PRIVATE_KEY</code> in <code>.env</code>
+          <p className="mt-2 text-[11px] text-bh-mute-2">
+            Set <code className="rounded bg-bh-paper-soft px-1">PRIVATE_KEY</code> in <code>.env</code>
             (Sepolia ETH from{" "}
-            <a className="text-emerald-300 underline" href="https://www.alchemy.com/faucets/base-sepolia" target="_blank">
+            <a className="text-bh-blue underline" href="https://www.alchemy.com/faucets/base-sepolia" target="_blank">
               Alchemy faucet
             </a>
             ) to broadcast real <code>giveFeedback</code> txs.
@@ -133,11 +133,11 @@ function SettlePanel({ status }: { status: SettlementStatus | null }) {
   }
 
   return (
-    <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
-      <h3 className="mb-2 text-sm font-medium text-zinc-400">settle_payment</h3>
-      <p className="mb-3 text-[11px] text-zinc-500">
+    <section className="rounded-lg border border-bh-line-strong bg-bh-paper/50 p-5">
+      <h3 className="mb-2 text-sm font-medium text-bh-mute">settle_payment</h3>
+      <p className="mb-3 text-[11px] text-bh-mute-2">
         Calls KeeperHub to create + trigger a payment workflow. With{" "}
-        <code className="rounded bg-zinc-800 px-1">KEEPERHUB_API_KEY</code> set this hits the real
+        <code className="rounded bg-bh-paper-soft px-1">KEEPERHUB_API_KEY</code> set this hits the real
         MCP/REST endpoint; otherwise it produces a deterministic stub receipt so the flow stays
         runnable.{" "}
         <ModeBadge
@@ -147,59 +147,59 @@ function SettlePanel({ status }: { status: SettlementStatus | null }) {
       </p>
       <form onSubmit={submit} className="grid gap-3 md:grid-cols-3">
         <label className="text-xs md:col-span-2">
-          <span className="text-zinc-500">agent_wallet</span>
+          <span className="text-bh-mute-2">agent_wallet</span>
           <input
             value={wallet}
             onChange={(e) => setWallet(e.target.value)}
-            className="mt-1 w-full rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-sm font-mono"
+            className="mt-1 w-full rounded border border-bh-line-strong bg-bh-canvas px-2 py-1.5 text-sm font-mono"
           />
         </label>
         <label className="text-xs">
-          <span className="text-zinc-500">amount (USDC)</span>
+          <span className="text-bh-mute-2">amount (USDC)</span>
           <input
             type="number"
             step="0.01"
             value={amount}
             onChange={(e) => setAmount(Number(e.target.value))}
-            className="mt-1 w-full rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-sm"
+            className="mt-1 w-full rounded border border-bh-line-strong bg-bh-canvas px-2 py-1.5 text-sm"
           />
         </label>
         <div className="md:col-span-3 flex justify-end">
           <button
             type="submit"
             disabled={running || !wallet}
-            className="rounded bg-emerald-500/20 px-3 py-1.5 text-sm text-emerald-200 ring-1 ring-emerald-400/30 hover:bg-emerald-500/30 disabled:opacity-40"
+            className="rounded bg-bh-blue-bright/25 px-3 py-1.5 text-sm text-bh-blue ring-1 ring-bh-blue-bright/40 hover:bg-bh-blue-bright/40 disabled:opacity-40"
           >
             {running ? "Settling…" : "Settle"}
           </button>
         </div>
       </form>
-      {err && <div className="mt-3 rounded border border-rose-900 bg-rose-950/40 p-3 text-xs text-rose-200">{err}</div>}
+      {err && <div className="mt-3 rounded border border-bh-red/40 bg-bh-red/10 p-3 text-xs text-bh-red">{err}</div>}
       {result && (
-        <div className="mt-3 rounded border border-zinc-800 bg-zinc-950 p-3 text-xs">
+        <div className="mt-3 rounded border border-bh-line-strong bg-bh-canvas p-3 text-xs">
           <div className="flex items-center justify-between">
-            <span className="text-zinc-400">
+            <span className="text-bh-mute">
               <ModeBadge mode={result.mode} live={result.mode !== "stub"} /> · {result.status}
             </span>
-            <span className="font-mono text-zinc-500">{result.workflow_id}</span>
+            <span className="font-mono text-bh-mute-2">{result.workflow_id}</span>
           </div>
-          <dl className="mt-2 grid grid-cols-2 gap-1 text-zinc-300">
-            <dt className="text-zinc-500">amount</dt>
+          <dl className="mt-2 grid grid-cols-2 gap-1 text-bh-ink-soft">
+            <dt className="text-bh-mute-2">amount</dt>
             <dd>{result.amount} {result.token}</dd>
-            <dt className="text-zinc-500">network</dt>
+            <dt className="text-bh-mute-2">network</dt>
             <dd>{result.network}</dd>
             {result.tx_hash && (
               <>
-                <dt className="text-zinc-500">tx</dt>
+                <dt className="text-bh-mute-2">tx</dt>
                 <dd className="break-all font-mono">
                   {result.tx_hash.startsWith("0xstub") ? (
-                    <span className="text-zinc-500">{result.tx_hash}</span>
+                    <span className="text-bh-mute-2">{result.tx_hash}</span>
                   ) : (
                     <a
                       href={txUrl(null, result.tx_hash)}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-emerald-300 hover:underline"
+                      className="text-bh-blue hover:underline"
                     >
                       {result.tx_hash}
                     </a>
@@ -209,10 +209,10 @@ function SettlePanel({ status }: { status: SettlementStatus | null }) {
             )}
           </dl>
           {result.audit_log && result.audit_log.length > 0 && (
-            <ul className="mt-2 space-y-0.5 text-zinc-400">
+            <ul className="mt-2 space-y-0.5 text-bh-mute">
               {result.audit_log.map((a, i) => (
                 <li key={i}>
-                  <span className={a.ok ? "text-emerald-400" : "text-rose-400"}>{a.ok ? "✓" : "✗"}</span>{" "}
+                  <span className={a.ok ? "text-bh-blue-bright" : "text-bh-red"}>{a.ok ? "✓" : "✗"}</span>{" "}
                   {a.step}
                 </li>
               ))}
@@ -227,16 +227,16 @@ function SettlePanel({ status }: { status: SettlementStatus | null }) {
 function FeedbackWalletStatus({ state }: { state: SubmitState }) {
   if (state.kind === "idle") return null;
   return (
-    <div className="mt-3 rounded border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs">
-      {state.kind === "submitting" && <div className="text-amber-300">⏳ {state.reason}…</div>}
+    <div className="mt-3 rounded border border-bh-blue-bright/40 bg-bh-blue-bright/10 p-3 text-xs">
+      {state.kind === "submitting" && <div className="text-bh-ink">⏳ {state.reason}…</div>}
       {state.kind === "broadcast" && (
         <div>
-          <div className="text-emerald-300">✓ broadcast — waiting for confirmation…</div>
+          <div className="text-bh-blue">✓ broadcast — waiting for confirmation…</div>
           <a
             href={txUrl(null, state.hash)}
             target="_blank"
             rel="noreferrer"
-            className="break-all font-mono text-emerald-300 hover:underline"
+            className="break-all font-mono text-bh-blue hover:underline"
           >
             {state.hash}
           </a>
@@ -244,21 +244,21 @@ function FeedbackWalletStatus({ state }: { state: SubmitState }) {
       )}
       {state.kind === "confirmed" && (
         <div>
-          <div className="text-emerald-300">
+          <div className="text-bh-blue">
             ✓ confirmed in block #{state.blockNumber.toString()} — feedback row written
           </div>
           <a
             href={txUrl(null, state.hash)}
             target="_blank"
             rel="noreferrer"
-            className="break-all font-mono text-emerald-300 hover:underline"
+            className="break-all font-mono text-bh-blue hover:underline"
           >
             {state.hash}
           </a>
         </div>
       )}
       {state.kind === "error" && (
-        <pre className="whitespace-pre-wrap text-rose-300">{state.message}</pre>
+        <pre className="whitespace-pre-wrap text-bh-red">{state.message}</pre>
       )}
     </div>
   );
@@ -318,11 +318,11 @@ function FeedbackPanel({ status }: { status: SettlementStatus | null }) {
   }
 
   return (
-    <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
-      <h3 className="mb-2 text-sm font-medium text-zinc-400">write_feedback (giveFeedback onchain)</h3>
-      <p className="mb-3 text-[11px] text-zinc-500">
+    <section className="rounded-lg border border-bh-line-strong bg-bh-paper/50 p-5">
+      <h3 className="mb-2 text-sm font-medium text-bh-mute">write_feedback (giveFeedback onchain)</h3>
+      <p className="mb-3 text-[11px] text-bh-mute-2">
         Writes a feedback row to the ERC-8004 Reputation Registry. With{" "}
-        <code className="rounded bg-zinc-800 px-1">PRIVATE_KEY</code> set, this signs and broadcasts a
+        <code className="rounded bg-bh-paper-soft px-1">PRIVATE_KEY</code> set, this signs and broadcasts a
         real Base Sepolia transaction; otherwise the panel returns the encoded calldata so you can
         inspect and broadcast it yourself.{" "}
         <ModeBadge
@@ -332,16 +332,16 @@ function FeedbackPanel({ status }: { status: SettlementStatus | null }) {
       </p>
       <form onSubmit={submit} className="grid gap-3 md:grid-cols-4">
         <label className="text-xs">
-          <span className="text-zinc-500">agent_id</span>
+          <span className="text-bh-mute-2">agent_id</span>
           <input
             type="number"
             value={agentId}
             onChange={(e) => setAgentId(Number(e.target.value))}
-            className="mt-1 w-full rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-sm"
+            className="mt-1 w-full rounded border border-bh-line-strong bg-bh-canvas px-2 py-1.5 text-sm"
           />
         </label>
         <label className="text-xs">
-          <span className="text-zinc-500">score (0..1)</span>
+          <span className="text-bh-mute-2">score (0..1)</span>
           <input
             type="number"
             step="0.01"
@@ -349,30 +349,30 @@ function FeedbackPanel({ status }: { status: SettlementStatus | null }) {
             max={1}
             value={score}
             onChange={(e) => setScore(Number(e.target.value))}
-            className="mt-1 w-full rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-sm"
+            className="mt-1 w-full rounded border border-bh-line-strong bg-bh-canvas px-2 py-1.5 text-sm"
           />
         </label>
         <label className="text-xs">
-          <span className="text-zinc-500">tag1</span>
+          <span className="text-bh-mute-2">tag1</span>
           <input
             value={tag1}
             onChange={(e) => setTag1(e.target.value)}
-            className="mt-1 w-full rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-sm"
+            className="mt-1 w-full rounded border border-bh-line-strong bg-bh-canvas px-2 py-1.5 text-sm"
           />
         </label>
         <label className="text-xs">
-          <span className="text-zinc-500">tag2</span>
+          <span className="text-bh-mute-2">tag2</span>
           <input
             value={tag2}
             onChange={(e) => setTag2(e.target.value)}
-            className="mt-1 w-full rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-sm"
+            className="mt-1 w-full rounded border border-bh-line-strong bg-bh-canvas px-2 py-1.5 text-sm"
           />
         </label>
         <div className="md:col-span-4 flex items-center justify-end gap-3">
           {isConnected && walletAddress && (
-            <span className="text-[11px] text-zinc-500">
+            <span className="text-[11px] text-bh-mute-2">
               wallet:{" "}
-              <code className="font-mono text-emerald-300">
+              <code className="font-mono text-bh-blue">
                 {walletAddress.slice(0, 6)}…{walletAddress.slice(-4)}
               </code>
             </span>
@@ -387,7 +387,7 @@ function FeedbackPanel({ status }: { status: SettlementStatus | null }) {
                   ? "Server signs with the operator PRIVATE_KEY"
                   : "Returns dry-run calldata — connect a wallet (or set PRIVATE_KEY) to broadcast"
             }
-            className="rounded bg-emerald-500/20 px-3 py-1.5 text-sm text-emerald-200 ring-1 ring-emerald-400/30 hover:bg-emerald-500/30 disabled:opacity-40"
+            className="rounded bg-bh-blue-bright/25 px-3 py-1.5 text-sm text-bh-blue ring-1 ring-bh-blue-bright/40 hover:bg-bh-blue-bright/40 disabled:opacity-40"
           >
             {running || wallet.state.kind === "submitting"
               ? "Writing…"
@@ -398,12 +398,12 @@ function FeedbackPanel({ status }: { status: SettlementStatus | null }) {
         </div>
       </form>
       <FeedbackWalletStatus state={wallet.state} />
-      {err && <div className="mt-3 rounded border border-rose-900 bg-rose-950/40 p-3 text-xs text-rose-200">{err}</div>}
+      {err && <div className="mt-3 rounded border border-bh-red/40 bg-bh-red/10 p-3 text-xs text-bh-red">{err}</div>}
       {result && (
-        <div className="mt-3 rounded border border-zinc-800 bg-zinc-950 p-3 text-xs">
+        <div className="mt-3 rounded border border-bh-line-strong bg-bh-canvas p-3 text-xs">
           <div className="flex items-center justify-between">
             <ModeBadge mode={result.mode} live={result.mode === "live"} />
-            <span className="text-zinc-500">
+            <span className="text-bh-mute-2">
               raw {result.score_raw} → score {result.score.toFixed(3)}
             </span>
           </div>
@@ -411,26 +411,26 @@ function FeedbackPanel({ status }: { status: SettlementStatus | null }) {
             <div className="mt-2">
               <a
                 href={txUrl(null, result.tx_hash)}
-                className="break-all font-mono text-emerald-300 underline"
+                className="break-all font-mono text-bh-blue underline"
                 target="_blank"
                 rel="noreferrer"
               >
                 {result.tx_hash}
               </a>
-              <div className="mt-1 text-zinc-400">
+              <div className="mt-1 text-bh-mute">
                 block {result.block_number} · gas {result.gas_used} · status {result.status}
               </div>
             </div>
           )}
           {result.mode === "dry_run" && (
             <div className="mt-2">
-              <div className="text-zinc-400">calldata (paste into your wallet to sign manually):</div>
-              <pre className="mt-1 max-h-40 overflow-auto rounded bg-black/50 p-2 break-all font-mono text-[10px] text-zinc-300">
+              <div className="text-bh-mute">calldata (paste into your wallet to sign manually):</div>
+              <pre className="mt-1 max-h-40 overflow-auto rounded border border-bh-line-strong bg-bh-canvas-deep p-2 break-all font-mono text-[10px] text-bh-ink-soft">
                 {result.calldata}
               </pre>
             </div>
           )}
-          {result.error && <div className="mt-2 text-rose-300">{result.error}</div>}
+          {result.error && <div className="mt-2 text-bh-red">{result.error}</div>}
         </div>
       )}
     </section>
@@ -510,30 +510,30 @@ function CompleteHirePanel() {
   function StatusBadge({ s }: { s: string }) {
     const colour =
       s === "ok"
-        ? "bg-emerald-500/20 text-emerald-200 ring-emerald-400/30"
+        ? "bg-bh-blue-bright/25 text-bh-blue ring-bh-blue-bright/40"
         : s.endsWith("_failed")
-        ? "bg-rose-500/20 text-rose-200 ring-rose-400/30"
-        : "bg-zinc-700/60 text-zinc-200 ring-zinc-500/30";
+        ? "bg-bh-red/20 text-bh-red ring-bh-red/40"
+        : "bg-bh-paper-soft text-bh-ink ring-bh-line-strong";
     return <span className={`rounded px-2 py-0.5 text-[10px] uppercase ring-1 ${colour}`}>{s}</span>;
   }
 
   return (
-    <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
-      <h3 className="mb-2 text-sm font-medium text-zinc-400">
+    <section className="rounded-lg border border-bh-line-strong bg-bh-paper/50 p-5">
+      <h3 className="mb-2 text-sm font-medium text-bh-mute">
         Complete hire loop · find_best_agent → A2A → settle → write_feedback
       </h3>
-      <p className="mb-3 text-[11px] text-zinc-500">
+      <p className="mb-3 text-[11px] text-bh-mute-2">
         Drives the whole pipeline end-to-end against the local Phase-4 workers. Settlement runs in
         stub mode (toggle in <code>.env</code>); feedback is written onchain only if you supply a real
         agent id (otherwise skipped — synthetic candidates have no on-chain counterpart).
       </p>
       <form onSubmit={submit} className="grid gap-3 md:grid-cols-4">
         <label className="text-xs">
-          <span className="text-zinc-500">service</span>
+          <span className="text-bh-mute-2">service</span>
           <select
             value={service}
             onChange={(e) => setService(e.target.value)}
-            className="mt-1 w-full rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-sm"
+            className="mt-1 w-full rounded border border-bh-line-strong bg-bh-canvas px-2 py-1.5 text-sm"
           >
             <option value="uppercase_text">uppercase_text</option>
             <option value="summarise_documents">summarise_documents</option>
@@ -541,25 +541,25 @@ function CompleteHirePanel() {
           </select>
         </label>
         <label className="text-xs md:col-span-2">
-          <span className="text-zinc-500">input</span>
+          <span className="text-bh-mute-2">input</span>
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            className="mt-1 w-full rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-sm font-mono"
+            className="mt-1 w-full rounded border border-bh-line-strong bg-bh-canvas px-2 py-1.5 text-sm font-mono"
           />
         </label>
         <label className="text-xs">
-          <span className="text-zinc-500">amount (USDC)</span>
+          <span className="text-bh-mute-2">amount (USDC)</span>
           <input
             type="number"
             step="0.01"
             value={amount}
             onChange={(e) => setAmount(Number(e.target.value))}
-            className="mt-1 w-full rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-sm"
+            className="mt-1 w-full rounded border border-bh-line-strong bg-bh-canvas px-2 py-1.5 text-sm"
           />
         </label>
         <label className="text-xs">
-          <span className="text-zinc-500">feedback score</span>
+          <span className="text-bh-mute-2">feedback score</span>
           <input
             type="number"
             step="0.01"
@@ -567,83 +567,83 @@ function CompleteHirePanel() {
             max={1}
             value={feedbackScore}
             onChange={(e) => setFeedbackScore(Number(e.target.value))}
-            className="mt-1 w-full rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-sm"
+            className="mt-1 w-full rounded border border-bh-line-strong bg-bh-canvas px-2 py-1.5 text-sm"
           />
         </label>
         <label className="text-xs">
-          <span className="text-zinc-500">target agent_id (-1 = skip feedback)</span>
+          <span className="text-bh-mute-2">target agent_id (-1 = skip feedback)</span>
           <input
             type="number"
             value={targetAgentId}
             onChange={(e) => setTargetAgentId(Number(e.target.value))}
-            className="mt-1 w-full rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-sm"
+            className="mt-1 w-full rounded border border-bh-line-strong bg-bh-canvas px-2 py-1.5 text-sm"
           />
         </label>
         <label className="text-xs md:col-span-2">
-          <span className="text-zinc-500">payee wallet</span>
+          <span className="text-bh-mute-2">payee wallet</span>
           <input
             value={payeeWallet}
             onChange={(e) => setPayeeWallet(e.target.value)}
-            className="mt-1 w-full rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-sm font-mono"
+            className="mt-1 w-full rounded border border-bh-line-strong bg-bh-canvas px-2 py-1.5 text-sm font-mono"
           />
         </label>
         <div className="md:col-span-4 flex justify-end">
           <button
             type="submit"
             disabled={running}
-            className="rounded bg-emerald-500/20 px-3 py-1.5 text-sm text-emerald-200 ring-1 ring-emerald-400/30 hover:bg-emerald-500/30 disabled:opacity-40"
+            className="rounded bg-bh-blue-bright/25 px-3 py-1.5 text-sm text-bh-blue ring-1 ring-bh-blue-bright/40 hover:bg-bh-blue-bright/40 disabled:opacity-40"
           >
             {running ? "Running…" : "Run full hire loop"}
           </button>
         </div>
       </form>
-      {err && <div className="mt-3 rounded border border-rose-900 bg-rose-950/40 p-3 text-xs text-rose-200">{err}</div>}
+      {err && <div className="mt-3 rounded border border-bh-red/40 bg-bh-red/10 p-3 text-xs text-bh-red">{err}</div>}
       {result && (
         <div className="mt-4 space-y-2 text-xs">
           <div className="flex items-center justify-between">
-            <span className="text-zinc-400">overall</span>
+            <span className="text-bh-mute">overall</span>
             <StatusBadge s={result.overall_status} />
           </div>
-          <div className="rounded border border-zinc-800 bg-zinc-950 p-3">
-            <div className="mb-1 text-zinc-400">1 · delivery (A2A)</div>
-            <div className="text-zinc-300">
+          <div className="rounded border border-bh-line-strong bg-bh-canvas p-3">
+            <div className="mb-1 text-bh-mute">1 · delivery (A2A)</div>
+            <div className="text-bh-ink-soft">
               winner index: {result.hire.winner_index ?? "—"} · attempts: {result.hire.attempts.length}
             </div>
             {result.hire.final_reply && (
-              <pre className="mt-1 overflow-auto text-[11px] text-emerald-200">
+              <pre className="mt-1 overflow-auto text-[11px] text-bh-blue">
                 {JSON.stringify(result.hire.final_reply, null, 2)}
               </pre>
             )}
           </div>
-          <div className="rounded border border-zinc-800 bg-zinc-950 p-3">
-            <div className="mb-1 text-zinc-400">2 · settlement (KeeperHub)</div>
+          <div className="rounded border border-bh-line-strong bg-bh-canvas p-3">
+            <div className="mb-1 text-bh-mute">2 · settlement (KeeperHub)</div>
             {result.settlement ? (
               <>
-                <div className="flex items-center justify-between text-zinc-300">
+                <div className="flex items-center justify-between text-bh-ink-soft">
                   <span>
                     {result.settlement.amount} {result.settlement.token} → {result.settlement.agent_wallet.slice(0, 10)}…
                   </span>
                   <ModeBadge mode={result.settlement.mode} live={result.settlement.mode !== "stub"} />
                 </div>
-                <div className="mt-1 text-zinc-500">
+                <div className="mt-1 text-bh-mute-2">
                   {result.settlement.status} · {result.settlement.workflow_id}
                 </div>
               </>
             ) : (
-              <div className="text-zinc-500">— skipped —</div>
+              <div className="text-bh-mute-2">— skipped —</div>
             )}
           </div>
-          <div className="rounded border border-zinc-800 bg-zinc-950 p-3">
-            <div className="mb-1 text-zinc-400">3 · feedback (ReputationRegistry)</div>
+          <div className="rounded border border-bh-line-strong bg-bh-canvas p-3">
+            <div className="mb-1 text-bh-mute">3 · feedback (ReputationRegistry)</div>
             {result.feedback ? (
-              <pre className="overflow-auto text-[11px] text-zinc-300">
+              <pre className="overflow-auto text-[11px] text-bh-ink-soft">
                 {JSON.stringify(result.feedback, null, 2)}
               </pre>
             ) : (
-              <div className="text-zinc-500">— skipped —</div>
+              <div className="text-bh-mute-2">— skipped —</div>
             )}
           </div>
-          {result.error && <div className="text-rose-300">{result.error}</div>}
+          {result.error && <div className="text-bh-red">{result.error}</div>}
         </div>
       )}
     </section>
@@ -673,7 +673,7 @@ function KeeperHubReadinessPanel() {
 
   if (!setup) {
     return (
-      <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 text-xs text-zinc-500">
+      <section className="rounded-lg border border-bh-line-strong bg-bh-paper/50 p-4 text-xs text-bh-mute-2">
         {err || "Probing KeeperHub readiness…"}
       </section>
     );
@@ -685,9 +685,9 @@ function KeeperHubReadinessPanel() {
   const everythingOk = setup.ready.keeperhub_live;
   if (everythingOk) {
     return (
-      <section className="rounded border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-emerald-200">
+      <section className="rounded border border-bh-blue-bright/40 bg-bh-blue-bright/10 p-3 text-xs text-bh-blue">
         ✓ KeeperHub live mode ready — API key configured and{" "}
-        <code className="rounded bg-zinc-800/60 px-1">{setup.keeperhub.api_url}</code> reachable.
+        <code className="rounded bg-bh-paper-soft/80 px-1">{setup.keeperhub.api_url}</code> reachable.
         Settlements below will broadcast for real.
       </section>
     );
@@ -697,57 +697,57 @@ function KeeperHubReadinessPanel() {
   // single-line callout rather than the full checklist.
   if (!setup.keeperhub.api_key_configured) {
     return (
-      <section className="rounded border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-200">
+      <section className="rounded border border-bh-yellow/50 bg-bh-yellow/10 p-3 text-xs text-bh-ink">
         Stub mode — settlement returns a deterministic{" "}
-        <code className="rounded bg-zinc-800/60 px-1">wf_&lt;sha256&gt;</code> workflow id with full
+        <code className="rounded bg-bh-paper-soft/80 px-1">wf_&lt;sha256&gt;</code> workflow id with full
         audit log so the loop is demonstrable. Set{" "}
-        <code className="rounded bg-zinc-800/60 px-1">KEEPERHUB_API_KEY</code> to upgrade to live.
+        <code className="rounded bg-bh-paper-soft/80 px-1">KEEPERHUB_API_KEY</code> to upgrade to live.
       </section>
     );
   }
 
   // The interesting case: API key set but the KeeperHub host is unreachable.
   return (
-    <section className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+    <section className="rounded-lg border border-bh-yellow/50 bg-bh-yellow/10 p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-sm font-medium text-amber-200">KeeperHub: API host unreachable</h3>
-          <p className="mt-1 text-[11px] text-zinc-400">
+          <h3 className="text-sm font-medium text-bh-ink">KeeperHub: API host unreachable</h3>
+          <p className="mt-1 text-[11px] text-bh-mute">
             API key is set, but{" "}
-            <code className="rounded bg-zinc-800/60 px-1">{setup.keeperhub.api_url}</code> isn't
+            <code className="rounded bg-bh-paper-soft/80 px-1">{setup.keeperhub.api_url}</code> isn't
             responding. Settlements will return{" "}
-            <code className="rounded bg-zinc-800/60 px-1">live-unreachable</code> until this is fixed.
+            <code className="rounded bg-bh-paper-soft/80 px-1">live-unreachable</code> until this is fixed.
           </p>
         </div>
         <button
           onClick={load}
           disabled={refreshing}
-          className="shrink-0 rounded bg-zinc-800/60 px-3 py-1.5 text-xs text-zinc-300 ring-1 ring-zinc-700 hover:bg-zinc-800 disabled:opacity-50"
+          className="shrink-0 rounded bg-bh-paper-soft/80 px-3 py-1.5 text-xs text-bh-ink-soft ring-1 ring-bh-line-strong hover:bg-bh-paper-soft disabled:opacity-50"
         >
           {refreshing ? "Probing…" : "Probe again"}
         </button>
       </div>
       <ol className="mt-3 space-y-2 text-sm">
         <li className="flex gap-2">
-          <span className="mr-1 inline-block w-3 text-center font-mono text-emerald-400">✓</span>
+          <span className="mr-1 inline-block w-3 text-center font-mono text-bh-blue-bright">✓</span>
           <div className="flex-1">
-            <div className="text-zinc-200">API key configured</div>
-            <div className="text-[11px] text-zinc-500">read from .env / loaded into the API process</div>
+            <div className="text-bh-ink">API key configured</div>
+            <div className="text-[11px] text-bh-mute-2">read from .env / loaded into the API process</div>
           </div>
         </li>
         <li className="flex gap-2">
-          <span className="mr-1 inline-block w-3 text-center font-mono text-amber-400">!</span>
+          <span className="mr-1 inline-block w-3 text-center font-mono text-bh-ink">!</span>
           <div className="flex-1">
-            <div className="text-zinc-200">Fund the KeeperHub org wallet (manual)</div>
-            <div className="text-[11px] text-zinc-500">
+            <div className="text-bh-ink">Fund the KeeperHub org wallet (manual)</div>
+            <div className="text-[11px] text-bh-mute-2">
               top up the org's source wallet with{" "}
-              <code className="rounded bg-zinc-800/60 px-1">{setup.keeperhub.token}</code> on{" "}
-              <code className="rounded bg-zinc-800/60 px-1">{setup.keeperhub.network}</code> at{" "}
+              <code className="rounded bg-bh-paper-soft/80 px-1">{setup.keeperhub.token}</code> on{" "}
+              <code className="rounded bg-bh-paper-soft/80 px-1">{setup.keeperhub.network}</code> at{" "}
               <a
                 href="https://app.keeperhub.com"
                 target="_blank"
                 rel="noreferrer"
-                className="text-emerald-400 hover:underline"
+                className="text-bh-blue-bright hover:underline"
               >
                 app.keeperhub.com
               </a>{" "}
@@ -756,27 +756,27 @@ function KeeperHubReadinessPanel() {
           </div>
         </li>
         <li className="flex gap-2">
-          <span className="mr-1 inline-block w-3 text-center font-mono text-rose-400">✗</span>
+          <span className="mr-1 inline-block w-3 text-center font-mono text-bh-red">✗</span>
           <div className="flex-1">
-            <div className="text-zinc-200">Reach KeeperHub's REST API</div>
-            <div className="text-[11px] text-zinc-500">
+            <div className="text-bh-ink">Reach KeeperHub's REST API</div>
+            <div className="text-[11px] text-bh-mute-2">
               the backend POSTs to{" "}
-              <code className="rounded bg-zinc-800/60 px-1">/api/execute/transfer</code> on{" "}
-              <code className="rounded bg-zinc-800/60 px-1">{setup.keeperhub.api_url}</code>. If
+              <code className="rounded bg-bh-paper-soft/80 px-1">/api/execute/transfer</code> on{" "}
+              <code className="rounded bg-bh-paper-soft/80 px-1">{setup.keeperhub.api_url}</code>. If
               you're behind egress restrictions or want to override the host, set{" "}
-              <code className="rounded bg-zinc-800/60 px-1">KEEPERHUB_API_URL</code> in{" "}
-              <code className="rounded bg-zinc-800/60 px-1">.env</code>. See{" "}
+              <code className="rounded bg-bh-paper-soft/80 px-1">KEEPERHUB_API_URL</code> in{" "}
+              <code className="rounded bg-bh-paper-soft/80 px-1">.env</code>. See{" "}
               <a
                 href="https://docs.keeperhub.com/api/direct-execution"
                 target="_blank"
                 rel="noreferrer"
-                className="text-emerald-400 hover:underline"
+                className="text-bh-blue-bright hover:underline"
               >
                 docs.keeperhub.com/api/direct-execution
               </a>
               .
               {setup.keeperhub.api_error && (
-                <span className="block mt-1 text-rose-300">{setup.keeperhub.api_error}</span>
+                <span className="block mt-1 text-bh-red">{setup.keeperhub.api_error}</span>
               )}
             </div>
           </div>
@@ -797,13 +797,13 @@ export function SettleTab() {
   return (
     <div className="space-y-6">
       <section>
-        <h2 className="mb-3 text-sm font-medium text-zinc-400">Phase 5 · settle &amp; record</h2>
+        <h2 className="mb-3 text-sm font-medium text-bh-mute">Phase 5 · settle &amp; record</h2>
         {err ? (
-          <div className="rounded border border-rose-900 bg-rose-950/40 p-3 text-xs text-rose-200">{err}</div>
+          <div className="rounded border border-bh-red/40 bg-bh-red/10 p-3 text-xs text-bh-red">{err}</div>
         ) : status ? (
           <StatusPanel status={status} />
         ) : (
-          <div className="text-sm text-zinc-500">Loading…</div>
+          <div className="text-sm text-bh-mute-2">Loading…</div>
         )}
       </section>
 

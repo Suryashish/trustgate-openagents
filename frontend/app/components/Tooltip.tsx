@@ -25,7 +25,7 @@ export function Tooltip({
   return (
     <span
       className={
-        "relative inline-block cursor-help underline decoration-dotted decoration-zinc-600 underline-offset-2 " +
+        "relative inline-block cursor-help underline decoration-dotted decoration-bh-mute-2 underline-offset-2 " +
         className
       }
       onMouseEnter={() => setShow(true)}
@@ -40,7 +40,7 @@ export function Tooltip({
         id={tipId}
         role="tooltip"
         className={
-          "pointer-events-none absolute left-1/2 top-full z-50 mt-1 w-max max-w-xs -translate-x-1/2 rounded bg-zinc-900 px-2 py-1 text-[11px] font-normal leading-snug text-zinc-100 ring-1 ring-zinc-700 transition-opacity duration-100 " +
+          "pointer-events-none absolute left-1/2 top-full z-50 mt-1 w-max max-w-xs -translate-x-1/2 rounded bg-bh-paper px-2 py-1 text-[11px] font-normal leading-snug text-bh-ink ring-1 ring-bh-line-strong transition-opacity duration-100 " +
           (show ? "opacity-100" : "opacity-0")
         }
       >

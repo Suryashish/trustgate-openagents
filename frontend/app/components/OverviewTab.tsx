@@ -8,10 +8,10 @@ import { Tooltip } from "./Tooltip";
 
 function Stat({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
-      <div className="text-xs uppercase tracking-wider text-zinc-500">{label}</div>
+    <div className="rounded-lg border border-bh-line-strong bg-bh-paper/50 p-4">
+      <div className="text-xs uppercase tracking-wider text-bh-mute-2">{label}</div>
       <div className="mt-1 text-2xl font-semibold tabular-nums">{value}</div>
-      {hint && <div className="mt-1 text-xs text-zinc-500">{hint}</div>}
+      {hint && <div className="mt-1 text-xs text-bh-mute-2">{hint}</div>}
     </div>
   );
 }
@@ -61,11 +61,11 @@ function deriveStages(r: CompleteHireResult | null): Record<StageKey, StageState
 
 function StagePill({ state, label }: { state: StageState; label: string }) {
   const styles: Record<StageState, string> = {
-    idle: "border-zinc-800 bg-zinc-900/40 text-zinc-500",
-    active: "border-amber-400/30 bg-amber-500/10 text-amber-300 animate-pulse",
-    ok: "border-emerald-400/30 bg-emerald-500/15 text-emerald-300",
-    fail: "border-rose-400/30 bg-rose-500/15 text-rose-300",
-    skipped: "border-zinc-700 bg-zinc-800/40 text-zinc-500",
+    idle: "border-bh-line-strong bg-bh-paper/50 text-bh-mute-2",
+    active: "border-bh-yellow/50 bg-bh-yellow/15 text-bh-ink animate-pulse",
+    ok: "border-bh-blue-bright/40 bg-bh-blue-bright/20 text-bh-blue",
+    fail: "border-bh-red/40 bg-bh-red/15 text-bh-red",
+    skipped: "border-bh-line-strong bg-bh-paper-soft/80 text-bh-mute-2",
   };
   const glyph = { idle: "·", active: "…", ok: "✓", fail: "✗", skipped: "—" }[state];
   return (
@@ -168,13 +168,13 @@ function SampleHirePanel() {
   })();
 
   return (
-    <section className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-5">
+    <section className="rounded-lg border border-bh-blue-bright/40 bg-bh-blue-bright/10 p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-medium text-emerald-200">Run a sample hire</h3>
-          <p className="mt-1 text-xs text-zinc-400">
+          <h3 className="text-sm font-medium text-bh-blue">Run a sample hire</h3>
+          <p className="mt-1 text-xs text-bh-mute">
             One click drives the whole loop against the local workers — no wallet, no gas, no setup
-            beyond <code className="rounded bg-zinc-800 px-1">bash scripts/run.sh</code>.
+            beyond <code className="rounded bg-bh-paper-soft px-1">bash scripts/run.sh</code>.
           </p>
         </div>
         <button
@@ -185,7 +185,7 @@ function SampleHirePanel() {
               ? "Need worker-b (port 9012) and worker-c (port 9022) online"
               : "Run discover → deliver → settle → feedback against the local workers"
           }
-          className="rounded bg-emerald-500/30 px-4 py-2 text-sm font-medium text-emerald-50 ring-1 ring-emerald-400/40 hover:bg-emerald-500/40 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded bg-bh-blue-bright/25 px-4 py-2 text-sm font-medium text-bh-blue ring-1 ring-bh-blue-bright/40 hover:bg-bh-blue-bright/40 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {running ? "Running…" : "Run a sample hire"}
         </button>
@@ -198,31 +198,31 @@ function SampleHirePanel() {
       </div>
 
       {!workersOnline.b || !workersOnline.c ? (
-        <p className="mt-3 text-[11px] text-amber-300">
-          Workers offline — run <code className="rounded bg-zinc-800 px-1">bash scripts/run.sh</code>{" "}
+        <p className="mt-3 text-[11px] text-bh-ink">
+          Workers offline — run <code className="rounded bg-bh-paper-soft px-1">bash scripts/run.sh</code>{" "}
           to bring up the full stack.
         </p>
       ) : null}
 
       {err && (
-        <pre className="mt-3 whitespace-pre-wrap rounded border border-rose-900 bg-rose-950/40 p-3 text-xs text-rose-200">
+        <pre className="mt-3 whitespace-pre-wrap rounded border border-bh-red/40 bg-bh-red/10 p-3 text-xs text-bh-red">
           {err}
         </pre>
       )}
 
       {result && replyText !== null && (
         <div className="mt-4 space-y-2 text-xs">
-          <div className="text-zinc-400">
-            Winner: <span className="text-zinc-100">worker-{result.hire?.winner_index === 0 ? "b" : "c"}</span>{" "}
-            · settled in <span className="tabular-nums text-zinc-100">{result.settlement?.elapsed_seconds?.toFixed(2) ?? "—"}s</span>{" "}
+          <div className="text-bh-mute">
+            Winner: <span className="text-bh-ink">worker-{result.hire?.winner_index === 0 ? "b" : "c"}</span>{" "}
+            · settled in <span className="tabular-nums text-bh-ink">{result.settlement?.elapsed_seconds?.toFixed(2) ?? "—"}s</span>{" "}
             · workflow{" "}
-            <code className="rounded bg-zinc-800 px-1 font-mono text-emerald-300">
+            <code className="rounded bg-bh-paper-soft px-1 font-mono text-bh-blue">
               {result.settlement?.workflow_id || "(none)"}
             </code>
           </div>
           <div>
-            <div className="text-zinc-500">Worker reply</div>
-            <pre className="mt-1 overflow-auto rounded bg-zinc-950/60 p-2 text-zinc-200 ring-1 ring-zinc-800">
+            <div className="text-bh-mute-2">Worker reply</div>
+            <pre className="mt-1 overflow-auto rounded bg-bh-canvas/60 p-2 text-bh-ink ring-1 ring-bh-line-strong">
               {replyText}
             </pre>
           </div>
@@ -238,7 +238,7 @@ function CodeAddrLink({ addr, href }: { addr: string; href: string }) {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="break-all font-mono text-[11px] text-emerald-300 hover:underline"
+      className="break-all font-mono text-[11px] text-bh-blue hover:underline"
     >
       {addr}
     </a>
@@ -265,7 +265,7 @@ export function OverviewTab({
   return (
     <div className="space-y-8">
       <section>
-        <h2 className="mb-3 text-sm font-medium text-zinc-400">Pipeline at a glance</h2>
+        <h2 className="mb-3 text-sm font-medium text-bh-mute">Pipeline at a glance</h2>
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
           <Stat
             label="Network"
@@ -299,13 +299,13 @@ export function OverviewTab({
       <SampleHirePanel />
 
       <section className="grid gap-3 md:grid-cols-2">
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
-          <h3 className="mb-3 text-sm font-medium text-zinc-400">The five-stage hiring loop</h3>
-          <ol className="space-y-2 text-sm text-zinc-300">
+        <div className="rounded-lg border border-bh-line-strong bg-bh-paper/50 p-5">
+          <h3 className="mb-3 text-sm font-medium text-bh-mute">The five-stage hiring loop</h3>
+          <ol className="space-y-2 text-sm text-bh-ink-soft">
             <li>
-              <span className="mr-2 text-emerald-400">1.</span>
+              <span className="mr-2 text-bh-blue-bright">1.</span>
               <span className="font-medium">Broadcast</span>
-              <span className="text-zinc-500">
+              <span className="text-bh-mute-2">
                 {" "}· Agent A sends a job spec over{" "}
                 <Tooltip text="Gensyn AXL — encrypted P2P mesh between agent nodes. No coordinator server.">
                   AXL
@@ -313,9 +313,9 @@ export function OverviewTab({
               </span>
             </li>
             <li>
-              <span className="mr-2 text-emerald-400">2.</span>
+              <span className="mr-2 text-bh-blue-bright">2.</span>
               <span className="font-medium">Discover</span>
-              <span className="text-zinc-500">
+              <span className="text-bh-mute-2">
                 {" "}·{" "}
                 <Tooltip text="ERC-8004 Identity Registry. Each agent is an ERC-721 NFT whose tokenURI points at a JSON card listing capabilities + endpoints.">
                   Identity Registry
@@ -324,9 +324,9 @@ export function OverviewTab({
               </span>
             </li>
             <li>
-              <span className="mr-2 text-emerald-400">3.</span>
+              <span className="mr-2 text-bh-blue-bright">3.</span>
               <span className="font-medium">Evaluate</span>
-              <span className="text-zinc-500">
+              <span className="text-bh-mute-2">
                 {" "}·{" "}
                 <Tooltip text="ERC-8004 Reputation Registry stores int128 scores in [-100, 100]. We normalize to [0,1] and average non-revoked entries client-side.">
                   Reputation Registry
@@ -337,9 +337,9 @@ export function OverviewTab({
               </span>
             </li>
             <li>
-              <span className="mr-2 text-emerald-400">4.</span>
+              <span className="mr-2 text-bh-blue-bright">4.</span>
               <span className="font-medium">Hire &amp; deliver</span>
-              <span className="text-zinc-500">
+              <span className="text-bh-mute-2">
                 {" "}· AXL{" "}
                 <Tooltip text="Agent-to-Agent JSON-RPC envelope. Forwarded over the AXL mesh; the receiver implements /.well-known/agent-card.json + a SendMessage POST handler.">
                   A2A SendMessage
@@ -348,9 +348,9 @@ export function OverviewTab({
               </span>
             </li>
             <li>
-              <span className="mr-2 text-emerald-400">5.</span>
+              <span className="mr-2 text-bh-blue-bright">5.</span>
               <span className="font-medium">Settle &amp; record</span>
-              <span className="text-zinc-500">
+              <span className="text-bh-mute-2">
                 {" "}·{" "}
                 <Tooltip text="KeeperHub orchestrates onchain payment workflows with retry + idempotency. Stub mode produces a deterministic audit trail for demos without a paid account.">
                   KeeperHub
@@ -365,12 +365,12 @@ export function OverviewTab({
           </ol>
         </div>
 
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
-          <h3 className="mb-3 text-sm font-medium text-zinc-400">Live contracts</h3>
+        <div className="rounded-lg border border-bh-line-strong bg-bh-paper/50 p-5">
+          <h3 className="mb-3 text-sm font-medium text-bh-mute">Live contracts</h3>
           {network ? (
             <dl className="space-y-3 text-sm">
               <div>
-                <dt className="text-xs text-zinc-500">Identity Registry</dt>
+                <dt className="text-xs text-bh-mute-2">Identity Registry</dt>
                 <dd>
                   <CodeAddrLink
                     addr={network.identity_registry}
@@ -379,7 +379,7 @@ export function OverviewTab({
                 </dd>
               </div>
               <div>
-                <dt className="text-xs text-zinc-500">Reputation Registry</dt>
+                <dt className="text-xs text-bh-mute-2">Reputation Registry</dt>
                 <dd>
                   <CodeAddrLink
                     addr={network.reputation_registry}
@@ -388,40 +388,40 @@ export function OverviewTab({
                 </dd>
               </div>
               <div>
-                <dt className="text-xs text-zinc-500">RPC</dt>
+                <dt className="text-xs text-bh-mute-2">RPC</dt>
                 <dd>
-                  <code className="break-all font-mono text-[11px] text-zinc-400">{network.rpc_url}</code>
+                  <code className="break-all font-mono text-[11px] text-bh-mute">{network.rpc_url}</code>
                 </dd>
               </div>
             </dl>
           ) : (
-            <p className="text-sm text-zinc-500">Loading…</p>
+            <p className="text-sm text-bh-mute-2">Loading…</p>
           )}
         </div>
       </section>
 
-      <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5 text-sm text-zinc-400">
-        <h3 className="mb-2 text-sm font-medium text-zinc-400">How to use this dashboard</h3>
+      <section className="rounded-lg border border-bh-line-strong bg-bh-paper/50 p-5 text-sm text-bh-mute">
+        <h3 className="mb-2 text-sm font-medium text-bh-mute">How to use this dashboard</h3>
         <ul className="list-disc space-y-1 pl-5">
           <li>
-            <span className="text-zinc-200">Agents</span> · browse the cached registry, filter by
+            <span className="text-bh-ink">Agents</span> · browse the cached registry, filter by
             capability, and inspect any agent&apos;s onchain card + reputation feedback.
           </li>
           <li>
-            <span className="text-zinc-200">Hire</span> · run <code className="rounded bg-zinc-800 px-1 py-0.5 text-xs">find_best_agent(capability, budget)</code>{" "}
+            <span className="text-bh-ink">Hire</span> · run <code className="rounded bg-bh-paper-soft px-1 py-0.5 text-xs">find_best_agent(capability, budget)</code>{" "}
             and see the 60/20/20 score breakdown for each candidate.
           </li>
           <li>
-            <span className="text-zinc-200">AXL Bridge</span> · view the local AXL nodes&apos; topology and
+            <span className="text-bh-ink">AXL Bridge</span> · view the local AXL nodes&apos; topology and
             replay the Phase 1 send-job loop end-to-end.
           </li>
           <li>
-            <span className="text-zinc-200">Settle</span> · Phase 5 — drive the full
+            <span className="text-bh-ink">Settle</span> · Phase 5 — drive the full
             hire → A2A → settle → write_feedback pipeline. Also exposes settle_payment
             and giveFeedback as separate panels with stub / dry-run modes.
           </li>
           <li>
-            <span className="text-zinc-200">Self</span> · Phase 6/7 — TrustGate is itself
+            <span className="text-bh-ink">Self</span> · Phase 6/7 — TrustGate is itself
             registered as an ERC-8004 agent. The Self tab shows the signer, the published
             card, and lets you re-broadcast registration / look up ENS names.
           </li>

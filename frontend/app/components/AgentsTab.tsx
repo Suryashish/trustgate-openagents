@@ -6,7 +6,7 @@ import { addressUrl, agentUrl, shortAddress, txUrl } from "@/lib/links";
 
 function CapPill({ children }: { children: React.ReactNode }) {
   return (
-    <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-zinc-300">
+    <span className="rounded bg-bh-paper-soft px-1.5 py-0.5 text-[10px] font-medium text-bh-ink-soft">
       {children}
     </span>
   );
@@ -31,16 +31,16 @@ function AgentRow({
       className={
         "cursor-pointer rounded border p-3 text-sm transition " +
         (selected
-          ? "border-emerald-500/40 bg-emerald-500/5"
+          ? "border-bh-blue-bright/40 bg-bh-blue-bright/10"
           : comparePinned
             ? "border-sky-500/40 bg-sky-500/5"
-            : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-700")
+            : "border-bh-line-strong bg-bh-paper/50 hover:border-bh-line-strong")
       }
       title={comparePinned ? "pinned for compare" : "click to inspect · shift-click to compare"}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="font-medium">
-          <span className="text-zinc-500">#{a.agent_id}</span>{" "}
+          <span className="text-bh-mute-2">#{a.agent_id}</span>{" "}
           <span>{a.name || "(no name)"}</span>
         </div>
         <a
@@ -48,13 +48,13 @@ function AgentRow({
           target="_blank"
           rel="noreferrer"
           onClick={(e) => e.stopPropagation()}
-          className="text-[10px] text-zinc-500 hover:text-emerald-300 hover:underline"
+          className="text-[10px] text-bh-mute-2 hover:text-bh-blue hover:underline"
           title={a.owner}
         >
           {a.owner_ens ? (
             <span>
-              <span className="text-emerald-300/80">{a.owner_ens}</span>
-              <span className="ml-1 font-mono text-zinc-600">{shortAddress(a.owner)}</span>
+              <span className="text-bh-blue/80">{a.owner_ens}</span>
+              <span className="ml-1 font-mono text-bh-mute-2">{shortAddress(a.owner)}</span>
             </span>
           ) : (
             <span className="font-mono">{shortAddress(a.owner)}</span>
@@ -66,7 +66,7 @@ function AgentRow({
           <CapPill key={c}>{c}</CapPill>
         ))}
         {a.capabilities.length > 6 && (
-          <span className="text-[10px] text-zinc-500">+{a.capabilities.length - 6}</span>
+          <span className="text-[10px] text-bh-mute-2">+{a.capabilities.length - 6}</span>
         )}
       </div>
     </li>
@@ -91,8 +91,8 @@ function AgentDetail({ id, network }: { id: number; network: NetworkInfo | null 
       .finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) return <div className="text-sm text-zinc-500">Loading agent #{id}…</div>;
-  if (err) return <div className="text-sm text-rose-300">{err}</div>;
+  if (loading) return <div className="text-sm text-bh-mute-2">Loading agent #{id}…</div>;
+  if (err) return <div className="text-sm text-bh-red">{err}</div>;
   if (!d) return null;
 
   const card = d.card;
@@ -102,52 +102,52 @@ function AgentDetail({ id, network }: { id: number; network: NetworkInfo | null 
     <div className="space-y-5 text-sm">
       <div>
         <div className="flex items-baseline justify-between gap-2">
-          <div className="text-xs uppercase tracking-wider text-zinc-500">Agent #{d.agent_id}</div>
+          <div className="text-xs uppercase tracking-wider text-bh-mute-2">Agent #{d.agent_id}</div>
           <a
             href={agentUrl(d.agent_id)}
             target="_blank"
             rel="noreferrer"
-            className="text-[11px] text-emerald-300 hover:underline"
+            className="text-[11px] text-bh-blue hover:underline"
           >
             view on 8004scan ↗
           </a>
         </div>
         <div className="text-xl font-semibold">{card?.name || "(no name)"}</div>
         {card?.description && (
-          <p className="mt-1 max-w-3xl text-zinc-300">{String(card.description)}</p>
+          <p className="mt-1 max-w-3xl text-bh-ink-soft">{String(card.description)}</p>
         )}
       </div>
 
-      <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
-        <h3 className="mb-2 text-xs uppercase tracking-wider text-zinc-500">Reputation</h3>
+      <section className="rounded-lg border border-bh-line-strong bg-bh-paper/50 p-4">
+        <h3 className="mb-2 text-xs uppercase tracking-wider text-bh-mute-2">Reputation</h3>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div>
-            <div className="text-[10px] text-zinc-500">Score (0..1)</div>
+            <div className="text-[10px] text-bh-mute-2">Score (0..1)</div>
             <div className="text-lg tabular-nums">{rep.score.toFixed(3)}</div>
           </div>
           <div>
-            <div className="text-[10px] text-zinc-500">Avg raw</div>
+            <div className="text-[10px] text-bh-mute-2">Avg raw</div>
             <div className="text-lg tabular-nums">{rep.average_raw.toFixed(1)}</div>
           </div>
           <div>
-            <div className="text-[10px] text-zinc-500">Active feedback</div>
+            <div className="text-[10px] text-bh-mute-2">Active feedback</div>
             <div className="text-lg tabular-nums">{rep.count}</div>
           </div>
           <div>
-            <div className="text-[10px] text-zinc-500">Avg trust</div>
+            <div className="text-[10px] text-bh-mute-2">Avg trust</div>
             <div className="text-lg tabular-nums">{rep.trust_level.toFixed(2)}</div>
           </div>
         </div>
         {d.feedback && d.feedback.length > 0 && (
           <div className="mt-4">
-            <div className="mb-1 flex items-center justify-between text-[10px] text-zinc-500">
+            <div className="mb-1 flex items-center justify-between text-[10px] text-bh-mute-2">
               <span>feedback timeline (oldest → newest)</span>
               <span>
-                <span className="mr-2 inline-block h-1.5 w-3 rounded-sm bg-emerald-400/80 align-middle"></span>positive ·{" "}
-                <span className="mr-2 inline-block h-1.5 w-3 rounded-sm bg-rose-400/80 align-middle"></span>negative
+                <span className="mr-2 inline-block h-1.5 w-3 rounded-sm bg-bh-blue-bright/80 align-middle"></span>positive ·{" "}
+                <span className="mr-2 inline-block h-1.5 w-3 rounded-sm bg-bh-red/80 align-middle"></span>negative
               </span>
             </div>
-            <div className="flex h-12 items-end gap-0.5 overflow-x-auto rounded border border-zinc-800 bg-zinc-950/60 p-1">
+            <div className="flex h-12 items-end gap-0.5 overflow-x-auto rounded border border-bh-line-strong bg-bh-canvas/60 p-1">
               {[...d.feedback]
                 .sort((a, b) => a.index - b.index)
                 .map((r) => {
@@ -160,10 +160,10 @@ function AgentDetail({ id, network }: { id: number; network: NetworkInfo | null 
                       className={
                         "shrink-0 w-2 rounded-sm transition-opacity " +
                         (r.revoked
-                          ? "bg-zinc-700 opacity-50"
+                          ? "bg-bh-paper-soft opacity-50"
                           : positive
-                            ? "bg-emerald-400/80 hover:bg-emerald-300"
-                            : "bg-rose-400/80 hover:bg-rose-300")
+                            ? "bg-bh-blue-bright/80 hover:bg-bh-blue-bright"
+                            : "bg-bh-red/80 hover:bg-bh-red")
                       }
                       style={{ height: `${h}px` }}
                       title={`#${r.index} · score ${r.score.toFixed(2)} (raw ${r.score_raw}) · ${r.tag || "(no tag)"}${r.revoked ? " · revoked" : ""}`}
@@ -174,9 +174,9 @@ function AgentDetail({ id, network }: { id: number; network: NetworkInfo | null 
           </div>
         )}
         {d.feedback && d.feedback.length > 0 && (
-          <div className="mt-4 max-h-72 overflow-auto rounded border border-zinc-800">
+          <div className="mt-4 max-h-72 overflow-auto rounded border border-bh-line-strong">
             <table className="min-w-full text-xs">
-              <thead className="bg-zinc-900 text-zinc-500">
+              <thead className="bg-bh-paper text-bh-mute-2">
                 <tr>
                   <th className="px-2 py-1.5 text-left">idx</th>
                   <th className="px-2 py-1.5 text-left">client</th>
@@ -190,7 +190,7 @@ function AgentDetail({ id, network }: { id: number; network: NetworkInfo | null 
                 {d.feedback.map((r) => (
                   <tr
                     key={`${r.client}-${r.index}`}
-                    className={r.revoked ? "text-zinc-600 line-through" : "text-zinc-300"}
+                    className={r.revoked ? "text-bh-mute-2 line-through" : "text-bh-ink-soft"}
                   >
                     <td className="px-2 py-1 tabular-nums">{r.index}</td>
                     <td className="px-2 py-1 font-mono">
@@ -198,7 +198,7 @@ function AgentDetail({ id, network }: { id: number; network: NetworkInfo | null 
                         href={addressUrl(network, r.client)}
                         target="_blank"
                         rel="noreferrer"
-                        className="hover:text-emerald-300 hover:underline"
+                        className="hover:text-bh-blue hover:underline"
                       >
                         {shortAddress(r.client)}
                       </a>
@@ -215,8 +215,8 @@ function AgentDetail({ id, network }: { id: number; network: NetworkInfo | null 
         )}
       </section>
 
-      <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
-        <h3 className="mb-2 text-xs uppercase tracking-wider text-zinc-500">Capabilities</h3>
+      <section className="rounded-lg border border-bh-line-strong bg-bh-paper/50 p-4">
+        <h3 className="mb-2 text-xs uppercase tracking-wider text-bh-mute-2">Capabilities</h3>
         <div className="flex flex-wrap gap-1">
           {(card?.endpoints || [])
             .flatMap((ep) =>
@@ -229,73 +229,73 @@ function AgentDetail({ id, network }: { id: number; network: NetworkInfo | null 
         </div>
       </section>
 
-      <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
-        <h3 className="mb-2 text-xs uppercase tracking-wider text-zinc-500">Endpoints</h3>
+      <section className="rounded-lg border border-bh-line-strong bg-bh-paper/50 p-4">
+        <h3 className="mb-2 text-xs uppercase tracking-wider text-bh-mute-2">Endpoints</h3>
         {(card?.endpoints || []).length === 0 ? (
-          <p className="text-zinc-500">none advertised</p>
+          <p className="text-bh-mute-2">none advertised</p>
         ) : (
           <ul className="space-y-2">
             {(card?.endpoints || []).map((ep, i) => (
-              <li key={i} className="rounded border border-zinc-800 bg-zinc-950/40 p-2 text-xs">
-                <div className="text-emerald-300">{ep.name}</div>
-                <div className="break-all font-mono text-zinc-300">{ep.endpoint}</div>
-                {ep.version && <div className="text-zinc-500">v{ep.version}</div>}
+              <li key={i} className="rounded border border-bh-line-strong bg-bh-canvas/40 p-2 text-xs">
+                <div className="text-bh-blue">{ep.name}</div>
+                <div className="break-all font-mono text-bh-ink-soft">{ep.endpoint}</div>
+                {ep.version && <div className="text-bh-mute-2">v{ep.version}</div>}
               </li>
             ))}
           </ul>
         )}
       </section>
 
-      <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
-        <h3 className="mb-2 text-xs uppercase tracking-wider text-zinc-500">On-chain provenance</h3>
+      <section className="rounded-lg border border-bh-line-strong bg-bh-paper/50 p-4">
+        <h3 className="mb-2 text-xs uppercase tracking-wider text-bh-mute-2">On-chain provenance</h3>
         <dl className="grid grid-cols-1 gap-1 text-xs sm:grid-cols-2">
           <div>
-            <dt className="text-zinc-500">Owner</dt>
+            <dt className="text-bh-mute-2">Owner</dt>
             <dd>
               {d.owner_ens && (
-                <div className="text-emerald-300">{d.owner_ens}</div>
+                <div className="text-bh-blue">{d.owner_ens}</div>
               )}
               <a
                 href={addressUrl(network, d.owner)}
                 target="_blank"
                 rel="noreferrer"
-                className="break-all font-mono text-emerald-300/80 hover:underline"
+                className="break-all font-mono text-bh-blue/80 hover:underline"
               >
                 {d.owner}
               </a>
             </dd>
           </div>
           <div>
-            <dt className="text-zinc-500">Block</dt>
+            <dt className="text-bh-mute-2">Block</dt>
             <dd className="tabular-nums">{d.block.toLocaleString()}</dd>
           </div>
           <div className="sm:col-span-2">
-            <dt className="text-zinc-500">tx</dt>
+            <dt className="text-bh-mute-2">tx</dt>
             <dd>
               {d.tx_hash && d.tx_hash !== "0x" + "0".repeat(64) ? (
                 <a
                   href={txUrl(network, d.tx_hash)}
                   target="_blank"
                   rel="noreferrer"
-                  className="break-all font-mono text-emerald-300 hover:underline"
+                  className="break-all font-mono text-bh-blue hover:underline"
                 >
                   {d.tx_hash}
                 </a>
               ) : (
-                <span className="font-mono text-zinc-500">{d.tx_hash}</span>
+                <span className="font-mono text-bh-mute-2">{d.tx_hash}</span>
               )}
             </dd>
           </div>
           <div className="sm:col-span-2">
-            <dt className="text-zinc-500">agentURI (registered)</dt>
-            <dd className="break-all font-mono text-zinc-400">
+            <dt className="text-bh-mute-2">agentURI (registered)</dt>
+            <dd className="break-all font-mono text-bh-mute">
               {d.agent_uri.length > 200 ? `${d.agent_uri.slice(0, 200)}…` : d.agent_uri}
             </dd>
           </div>
           {d.live_token_uri && d.live_token_uri !== d.agent_uri && (
             <div className="sm:col-span-2">
-              <dt className="text-amber-400">live tokenURI (current — drifted)</dt>
-              <dd className="break-all font-mono text-amber-200/80">
+              <dt className="text-bh-ink">live tokenURI (current — drifted)</dt>
+              <dd className="break-all font-mono text-bh-ink/80">
                 {d.live_token_uri.length > 200 ? `${d.live_token_uri.slice(0, 200)}…` : d.live_token_uri}
               </dd>
             </div>
@@ -361,8 +361,8 @@ export function AgentsTab({ network }: { network: NetworkInfo | null }) {
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
       <div className="space-y-3">
         {topCaps.length > 0 && (
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-3">
-            <div className="mb-2 text-[10px] uppercase tracking-wider text-zinc-500">
+          <div className="rounded-lg border border-bh-line-strong bg-bh-paper/50 p-3">
+            <div className="mb-2 text-[10px] uppercase tracking-wider text-bh-mute-2">
               Browse by capability
             </div>
             <div className="flex flex-wrap gap-1.5 text-[11px]">
@@ -377,13 +377,13 @@ export function AgentsTab({ network }: { network: NetworkInfo | null }) {
                   className={
                     "rounded px-2 py-0.5 transition " +
                     (c.capability === capability
-                      ? "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-400/30"
-                      : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700")
+                      ? "bg-bh-blue-bright/25 text-bh-blue ring-1 ring-bh-blue-bright/40"
+                      : "bg-bh-paper-soft text-bh-ink-soft hover:bg-bh-paper-soft")
                   }
                   title={`${c.count} agents advertise ${c.capability}`}
                 >
                   {c.capability.length > 26 ? `${c.capability.slice(0, 26)}…` : c.capability}
-                  <span className="ml-1 text-[10px] text-zinc-500">·{c.count}</span>
+                  <span className="ml-1 text-[10px] text-bh-mute-2">·{c.count}</span>
                 </button>
               ))}
             </div>
@@ -406,11 +406,11 @@ export function AgentsTab({ network }: { network: NetworkInfo | null }) {
             value={pendingCap}
             onChange={(e) => setPendingCap(e.target.value)}
             placeholder="filter capability — e.g. swap"
-            className="flex-1 rounded border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm placeholder-zinc-600 focus:border-emerald-500 focus:outline-none"
+            className="flex-1 rounded border border-bh-line-strong bg-bh-canvas px-3 py-1.5 text-sm placeholder-bh-mute-2 focus:border-bh-blue-bright focus:outline-none"
           />
           <button
             type="submit"
-            className="rounded bg-emerald-500/20 px-3 py-1.5 text-sm text-emerald-200 ring-1 ring-emerald-400/30 hover:bg-emerald-500/30"
+            className="rounded bg-bh-blue-bright/25 px-3 py-1.5 text-sm text-bh-blue ring-1 ring-bh-blue-bright/40 hover:bg-bh-blue-bright/40"
           >
             Filter
           </button>
@@ -421,25 +421,25 @@ export function AgentsTab({ network }: { network: NetworkInfo | null }) {
                 setPendingCap("");
                 setCapability("");
               }}
-              className="rounded bg-zinc-800 px-2 py-1.5 text-xs text-zinc-400 hover:text-zinc-200"
+              className="rounded bg-bh-paper-soft px-2 py-1.5 text-xs text-bh-mute hover:text-bh-ink"
               title="Clear capability filter"
             >
               Clear
             </button>
           )}
         </form>
-        <label className="flex items-center gap-2 text-xs text-zinc-400">
+        <label className="flex items-center gap-2 text-xs text-bh-mute">
           <input
             type="checkbox"
             checked={activeOnly}
             onChange={(e) => setActiveOnly(e.target.checked)}
-            className="accent-emerald-500"
+            className="accent-bh-blue-bright"
           />
           active only
         </label>
 
-        {loading && <div className="text-sm text-zinc-500">Loading…</div>}
-        {err && <div className="text-sm text-rose-300">{err}</div>}
+        {loading && <div className="text-sm text-bh-mute-2">Loading…</div>}
+        {err && <div className="text-sm text-bh-red">{err}</div>}
 
         <ul className="max-h-[70vh] space-y-2 overflow-auto pr-1">
           {agents.map((a) => (
@@ -465,7 +465,7 @@ export function AgentsTab({ network }: { network: NetworkInfo | null }) {
             />
           ))}
           {!loading && agents.length === 0 && (
-            <li className="text-sm text-zinc-500">No agents matched.</li>
+            <li className="text-sm text-bh-mute-2">No agents matched.</li>
           )}
         </ul>
       </div>
@@ -473,17 +473,17 @@ export function AgentsTab({ network }: { network: NetworkInfo | null }) {
       <div
         className={
           compareWith != null
-            ? "grid gap-3 rounded-lg border border-zinc-800 bg-zinc-900/20 p-4 lg:grid-cols-2"
-            : "rounded-lg border border-zinc-800 bg-zinc-900/20 p-4"
+            ? "grid gap-3 rounded-lg border border-bh-line-strong bg-bh-paper/50 p-4 lg:grid-cols-2"
+            : "rounded-lg border border-bh-line-strong bg-bh-paper/50 p-4"
         }
       >
         {selected != null ? (
-          <div className={compareWith != null ? "border-r border-zinc-800 pr-3 lg:pr-4" : ""}>
+          <div className={compareWith != null ? "border-r border-bh-line-strong pr-3 lg:pr-4" : ""}>
             <AgentDetail id={selected} network={network} />
           </div>
         ) : (
-          <div className="text-sm text-zinc-500">
-            Click an agent to inspect. <span className="text-zinc-600">Shift-click a second agent to compare side-by-side.</span>
+          <div className="text-sm text-bh-mute-2">
+            Click an agent to inspect. <span className="text-bh-mute-2">Shift-click a second agent to compare side-by-side.</span>
           </div>
         )}
         {compareWith != null && (
@@ -492,7 +492,7 @@ export function AgentsTab({ network }: { network: NetworkInfo | null }) {
               <div className="text-[10px] uppercase tracking-wider text-sky-300/80">comparing with</div>
               <button
                 onClick={() => setCompareWith(null)}
-                className="rounded bg-zinc-800/60 px-2 py-0.5 text-[10px] text-zinc-400 ring-1 ring-zinc-700 hover:text-zinc-200"
+                className="rounded bg-bh-paper-soft/80 px-2 py-0.5 text-[10px] text-bh-mute ring-1 ring-bh-line-strong hover:text-bh-ink"
               >
                 Close
               </button>

@@ -19,8 +19,8 @@ function ModeBadge({ live, label }: { live: boolean; label: string }) {
       className={
         "rounded px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider " +
         (live
-          ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-400/30"
-          : "bg-amber-500/15 text-amber-300 ring-1 ring-amber-400/30")
+          ? "bg-bh-blue-bright/25 text-bh-blue ring-1 ring-bh-blue-bright/40"
+          : "bg-bh-yellow/20 text-bh-ink ring-1 ring-bh-yellow/50")
       }
     >
       {label}
@@ -30,7 +30,7 @@ function ModeBadge({ live, label }: { live: boolean; label: string }) {
 
 function CodeBlock({ children }: { children: React.ReactNode }) {
   return (
-    <pre className="max-h-72 overflow-auto rounded bg-zinc-950/60 p-3 text-[11px] leading-relaxed text-zinc-300 ring-1 ring-zinc-800">
+    <pre className="max-h-72 overflow-auto rounded bg-bh-canvas/60 p-3 text-[11px] leading-relaxed text-bh-ink-soft ring-1 ring-bh-line-strong">
       {children}
     </pre>
   );
@@ -52,40 +52,40 @@ function WalletSubmitStatus({
 }) {
   if (state.kind === "idle") return null;
   return (
-    <div className="mt-3 rounded border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs">
+    <div className="mt-3 rounded border border-bh-blue-bright/40 bg-bh-blue-bright/10 p-3 text-xs">
       {state.kind === "submitting" && (
-        <div className="text-amber-300">⏳ {state.reason}…</div>
+        <div className="text-bh-ink">⏳ {state.reason}…</div>
       )}
       {state.kind === "broadcast" && (
         <div>
-          <div className="text-emerald-300">✓ broadcast</div>
+          <div className="text-bh-blue">✓ broadcast</div>
           <a
             href={txUrl({ chain_id: chainId }, state.hash)}
             target="_blank"
             rel="noreferrer"
-            className="break-all font-mono text-emerald-300 hover:underline"
+            className="break-all font-mono text-bh-blue hover:underline"
           >
             {state.hash}
           </a>
-          <div className="mt-1 text-zinc-500">waiting for confirmation…</div>
+          <div className="mt-1 text-bh-mute-2">waiting for confirmation…</div>
         </div>
       )}
       {state.kind === "confirmed" && (
         <div>
-          <div className="text-emerald-300">✓ confirmed in block #{state.blockNumber.toString()}</div>
+          <div className="text-bh-blue">✓ confirmed in block #{state.blockNumber.toString()}</div>
           <a
             href={txUrl({ chain_id: chainId }, state.hash)}
             target="_blank"
             rel="noreferrer"
-            className="break-all font-mono text-emerald-300 hover:underline"
+            className="break-all font-mono text-bh-blue hover:underline"
           >
             {state.hash}
           </a>
-          {followUpLabel && <div className="mt-1 text-zinc-500">{followUpLabel}</div>}
+          {followUpLabel && <div className="mt-1 text-bh-mute-2">{followUpLabel}</div>}
         </div>
       )}
       {state.kind === "error" && (
-        <pre className="whitespace-pre-wrap text-rose-300">{state.message}</pre>
+        <pre className="whitespace-pre-wrap text-bh-red">{state.message}</pre>
       )}
     </div>
   );
@@ -241,34 +241,34 @@ export function SelfTab() {
   return (
     <div className="space-y-8">
       {bootError && (
-        <pre className="whitespace-pre-wrap rounded border border-rose-900 bg-rose-950/40 p-4 text-sm text-rose-200">
+        <pre className="whitespace-pre-wrap rounded border border-bh-red/40 bg-bh-red/10 p-4 text-sm text-bh-red">
           {bootError}
         </pre>
       )}
 
       <section className="grid gap-3 md:grid-cols-2">
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
+        <div className="rounded-lg border border-bh-line-strong bg-bh-paper/50 p-5">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-medium text-zinc-400">TrustGate signer</h3>
+            <h3 className="text-sm font-medium text-bh-mute">TrustGate signer</h3>
             <ModeBadge live={signerLive} label={signerLive ? "live" : "dry-run"} />
           </div>
           {status ? (
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <dt className="text-xs text-zinc-500">private key</dt>
-                <dd className="text-zinc-200">
+                <dt className="text-xs text-bh-mute-2">private key</dt>
+                <dd className="text-bh-ink">
                   {status.signer.private_key_configured ? "configured" : "not set"}
                 </dd>
               </div>
               {status.signer.address && (
                 <div className="flex justify-between">
-                  <dt className="text-xs text-zinc-500">address</dt>
+                  <dt className="text-xs text-bh-mute-2">address</dt>
                   <dd>
                     <a
                       href={addressUrl({ chain_id: status.chain_id }, status.signer.address)}
                       target="_blank"
                       rel="noreferrer"
-                      className="break-all font-mono text-[11px] text-emerald-300 hover:underline"
+                      className="break-all font-mono text-[11px] text-bh-blue hover:underline"
                     >
                       {status.signer.address}
                     </a>
@@ -277,29 +277,29 @@ export function SelfTab() {
               )}
               {status.signer.balance_eth !== undefined && (
                 <div className="flex justify-between">
-                  <dt className="text-xs text-zinc-500">balance</dt>
-                  <dd className="text-zinc-200">{status.signer.balance_eth.toFixed(5)} ETH</dd>
+                  <dt className="text-xs text-bh-mute-2">balance</dt>
+                  <dd className="text-bh-ink">{status.signer.balance_eth.toFixed(5)} ETH</dd>
                 </div>
               )}
               <div className="flex justify-between">
-                <dt className="text-xs text-zinc-500">ENS name (mainnet)</dt>
-                <dd className="text-zinc-200">
+                <dt className="text-xs text-bh-mute-2">ENS name (mainnet)</dt>
+                <dd className="text-bh-ink">
                   {status.signer.ens_name ? (
-                    <span className="text-emerald-300">{status.signer.ens_name}</span>
+                    <span className="text-bh-blue">{status.signer.ens_name}</span>
                   ) : (
-                    <span className="text-zinc-500">none / unreachable</span>
+                    <span className="text-bh-mute-2">none / unreachable</span>
                   )}
                 </dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-xs text-zinc-500">network</dt>
-                <dd className="text-zinc-200">
+                <dt className="text-xs text-bh-mute-2">network</dt>
+                <dd className="text-bh-ink">
                   {status.network} (chain {status.chain_id})
                 </dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-xs text-zinc-500">already-owned ids</dt>
-                <dd className="text-zinc-200">
+                <dt className="text-xs text-bh-mute-2">already-owned ids</dt>
+                <dd className="text-bh-ink">
                   {status.owned_agent_ids.length === 0
                     ? "(none on this network)"
                     : status.owned_agent_ids.map((id, i) => (
@@ -309,7 +309,7 @@ export function SelfTab() {
                             href={agentUrl(id)}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-emerald-300 hover:underline"
+                            className="text-bh-blue hover:underline"
                           >
                             #{id}
                           </a>
@@ -319,20 +319,20 @@ export function SelfTab() {
               </div>
             </dl>
           ) : (
-            <p className="text-sm text-zinc-500">Loading…</p>
+            <p className="text-sm text-bh-mute-2">Loading…</p>
           )}
           {!signerLive && (
-            <p className="mt-3 text-[11px] text-zinc-500">
-              Set <code className="rounded bg-zinc-800 px-1">PRIVATE_KEY</code> in{" "}
-              <code className="rounded bg-zinc-800 px-1">.env</code> (next to{" "}
-              <code className="rounded bg-zinc-800 px-1">app/</code>) to broadcast a real
-              <code className="ml-1 rounded bg-zinc-800 px-1">register(string)</code> tx.
+            <p className="mt-3 text-[11px] text-bh-mute-2">
+              Set <code className="rounded bg-bh-paper-soft px-1">PRIVATE_KEY</code> in{" "}
+              <code className="rounded bg-bh-paper-soft px-1">.env</code> (next to{" "}
+              <code className="rounded bg-bh-paper-soft px-1">app/</code>) to broadcast a real
+              <code className="ml-1 rounded bg-bh-paper-soft px-1">register(string)</code> tx.
               Faucet:{" "}
               <a
                 href="https://www.alchemy.com/faucets/base-sepolia"
                 target="_blank"
                 rel="noreferrer"
-                className="text-emerald-400 hover:underline"
+                className="text-bh-blue-bright hover:underline"
               >
                 alchemy.com/faucets/base-sepolia
               </a>
@@ -340,48 +340,48 @@ export function SelfTab() {
           )}
         </div>
 
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
-          <h3 className="mb-3 text-sm font-medium text-zinc-400">Agent card preview</h3>
+        <div className="rounded-lg border border-bh-line-strong bg-bh-paper/50 p-5">
+          <h3 className="mb-3 text-sm font-medium text-bh-mute">Agent card preview</h3>
           {status ? (
             <>
-              <p className="mb-2 text-xs text-zinc-500">
+              <p className="mb-2 text-xs text-bh-mute-2">
                 {status.agent_uri_bytes} bytes · stored as{" "}
-                <code className="rounded bg-zinc-800 px-1">data:application/json;base64,…</code>
+                <code className="rounded bg-bh-paper-soft px-1">data:application/json;base64,…</code>
               </p>
               <CodeBlock>{JSON.stringify(status.card, null, 2)}</CodeBlock>
             </>
           ) : (
-            <p className="text-sm text-zinc-500">Loading…</p>
+            <p className="text-sm text-bh-mute-2">Loading…</p>
           )}
         </div>
       </section>
 
-      <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
-        <h3 className="mb-2 text-sm font-medium text-zinc-400">Register TrustGate as ERC-8004 agent</h3>
-        <p className="mb-3 text-xs text-zinc-500">
-          Calls <code className="rounded bg-zinc-800 px-1">register(string agentURI)</code> on{" "}
-          <code className="break-all font-mono text-emerald-300">{status?.identity_registry || "…"}</code>.
+      <section className="rounded-lg border border-bh-line-strong bg-bh-paper/50 p-5">
+        <h3 className="mb-2 text-sm font-medium text-bh-mute">Register TrustGate as ERC-8004 agent</h3>
+        <p className="mb-3 text-xs text-bh-mute-2">
+          Calls <code className="rounded bg-bh-paper-soft px-1">register(string agentURI)</code> on{" "}
+          <code className="break-all font-mono text-bh-blue">{status?.identity_registry || "…"}</code>.
           Endpoints below are stamped into the card before signing — leave both blank to register a
           card with no AXL/HTTP endpoint (you can set them later via{" "}
-          <code className="rounded bg-zinc-800 px-1">setAgentURI</code>).
+          <code className="rounded bg-bh-paper-soft px-1">setAgentURI</code>).
         </p>
         <div className="grid gap-3 md:grid-cols-2">
           <label className="block text-xs">
-            <span className="text-zinc-400">AXL public key (optional)</span>
+            <span className="text-bh-mute">AXL public key (optional)</span>
             <input
               value={axlPubkey}
               onChange={(e) => setAxlPubkey(e.target.value)}
               placeholder="auto-detected from n1 topology when AXL is up"
-              className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950/40 px-2 py-1.5 font-mono text-[12px] text-zinc-200"
+              className="mt-1 w-full rounded border border-bh-line-strong bg-bh-canvas/40 px-2 py-1.5 font-mono text-[12px] text-bh-ink"
             />
           </label>
           <label className="block text-xs">
-            <span className="text-zinc-400">HTTP endpoint (optional)</span>
+            <span className="text-bh-mute">HTTP endpoint (optional)</span>
             <input
               value={apiUrl}
               onChange={(e) => setApiUrl(e.target.value)}
               placeholder="defaults to the API base (override for a public hostname)"
-              className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950/40 px-2 py-1.5 font-mono text-[12px] text-zinc-200"
+              className="mt-1 w-full rounded border border-bh-line-strong bg-bh-canvas/40 px-2 py-1.5 font-mono text-[12px] text-bh-ink"
             />
           </label>
         </div>
@@ -396,7 +396,7 @@ export function SelfTab() {
                   ? "Server signs with the operator PRIVATE_KEY"
                   : "No signer available — preview-only"
             }
-            className="rounded bg-emerald-500/20 px-3 py-1.5 text-sm font-medium text-emerald-200 ring-1 ring-emerald-400/30 hover:bg-emerald-500/30 disabled:opacity-50"
+            className="rounded bg-bh-blue-bright/25 px-3 py-1.5 text-sm font-medium text-bh-blue ring-1 ring-bh-blue-bright/40 hover:bg-bh-blue-bright/40 disabled:opacity-50"
           >
             {registering || registerSubmit.state.kind === "submitting"
               ? "Submitting…"
@@ -408,13 +408,13 @@ export function SelfTab() {
           </button>
           <button
             onClick={() => refresh({ axl_pubkey: axlPubkey || undefined })}
-            className="rounded bg-zinc-800/60 px-3 py-1.5 text-sm text-zinc-300 ring-1 ring-zinc-700 hover:bg-zinc-800"
+            className="rounded bg-bh-paper-soft/80 px-3 py-1.5 text-sm text-bh-ink-soft ring-1 ring-bh-line-strong hover:bg-bh-paper-soft"
           >
             Refresh card preview
           </button>
           {isConnected && (
-            <span className="text-[11px] text-zinc-500">
-              wallet: <code className="font-mono text-emerald-300">{walletAddress?.slice(0, 6)}…{walletAddress?.slice(-4)}</code>
+            <span className="text-[11px] text-bh-mute-2">
+              wallet: <code className="font-mono text-bh-blue">{walletAddress?.slice(0, 6)}…{walletAddress?.slice(-4)}</code>
             </span>
           )}
         </div>
@@ -424,27 +424,27 @@ export function SelfTab() {
           followUpLabel="agent_id will appear once the tx confirms — refresh below"
         />
         {registerError && (
-          <pre className="mt-3 whitespace-pre-wrap rounded border border-rose-900 bg-rose-950/40 p-3 text-xs text-rose-200">
+          <pre className="mt-3 whitespace-pre-wrap rounded border border-bh-red/40 bg-bh-red/10 p-3 text-xs text-bh-red">
             {registerError}
           </pre>
         )}
         {registerResult && (
           <div className="mt-3 space-y-2 text-xs">
             <div className="flex items-center gap-2">
-              <span className="text-zinc-500">mode:</span>
+              <span className="text-bh-mute-2">mode:</span>
               <ModeBadge
                 live={registerResult.mode === "live"}
                 label={registerResult.mode === "live" ? "broadcast" : "dry-run"}
               />
             </div>
             {registerResult.mode === "live" && registerResult.tx_hash && (
-              <p className="text-zinc-300">
+              <p className="text-bh-ink-soft">
                 tx:{" "}
                 <a
                   href={txUrl({ chain_id: status?.chain_id ?? 84532 }, registerResult.tx_hash)}
                   target="_blank"
                   rel="noreferrer"
-                  className="break-all font-mono text-emerald-300 hover:underline"
+                  className="break-all font-mono text-bh-blue hover:underline"
                 >
                   {registerResult.tx_hash}
                 </a>
@@ -453,7 +453,7 @@ export function SelfTab() {
                     href={agentUrl(registerResult.agent_id)}
                     target="_blank"
                     rel="noreferrer"
-                    className="ml-2 rounded bg-emerald-500/20 px-2 py-0.5 text-emerald-200 ring-1 ring-emerald-400/30 hover:bg-emerald-500/30"
+                    className="ml-2 rounded bg-bh-blue-bright/25 px-2 py-0.5 text-bh-blue ring-1 ring-bh-blue-bright/40 hover:bg-bh-blue-bright/40"
                   >
                     new agent #{registerResult.agent_id}
                   </a>
@@ -462,16 +462,16 @@ export function SelfTab() {
             )}
             {registerResult.mode === "dry_run" && (
               <>
-                <p className="text-zinc-400">
+                <p className="text-bh-mute">
                   to:{" "}
-                  <code className="break-all font-mono text-emerald-300">{registerResult.to}</code>
+                  <code className="break-all font-mono text-bh-blue">{registerResult.to}</code>
                 </p>
-                <p className="text-zinc-400">
-                  selector: <code className="font-mono text-emerald-300">0xf2c298be</code>{" "}
-                  <span className="text-zinc-500">(register(string))</span>
+                <p className="text-bh-mute">
+                  selector: <code className="font-mono text-bh-blue">0xf2c298be</code>{" "}
+                  <span className="text-bh-mute-2">(register(string))</span>
                 </p>
                 <details>
-                  <summary className="cursor-pointer text-zinc-400 hover:text-zinc-200">
+                  <summary className="cursor-pointer text-bh-mute hover:text-bh-ink">
                     show calldata ({registerResult.calldata?.length ?? 0} chars)
                   </summary>
                   <CodeBlock>{registerResult.calldata}</CodeBlock>
@@ -483,21 +483,21 @@ export function SelfTab() {
       </section>
 
       {(status?.owned_agent_ids?.length ?? 0) > 0 && (
-        <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
-          <h3 className="mb-2 text-sm font-medium text-zinc-400">Update existing card · setAgentURI</h3>
-          <p className="mb-3 text-xs text-zinc-500">
+        <section className="rounded-lg border border-bh-line-strong bg-bh-paper/50 p-5">
+          <h3 className="mb-2 text-sm font-medium text-bh-mute">Update existing card · setAgentURI</h3>
+          <p className="mb-3 text-xs text-bh-mute-2">
             Re-publishes the card on an agent id you already own. Reputation history is
-            preserved (vs. <code className="rounded bg-zinc-800 px-1">register</code>, which
+            preserved (vs. <code className="rounded bg-bh-paper-soft px-1">register</code>, which
             mints a new id). Reverts if the signer isn&apos;t the owner — we pre-flight that
             client-side so you don&apos;t waste gas.
           </p>
           <div className="grid gap-3 md:grid-cols-3">
             <label className="block text-xs">
-              <span className="text-zinc-400">Target agent id</span>
+              <span className="text-bh-mute">Target agent id</span>
               <select
                 value={updateAgentId ?? ""}
                 onChange={(e) => setUpdateAgentId(Number(e.target.value))}
-                className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950/40 px-2 py-1.5 font-mono text-[12px] text-zinc-200"
+                className="mt-1 w-full rounded border border-bh-line-strong bg-bh-canvas/40 px-2 py-1.5 font-mono text-[12px] text-bh-ink"
               >
                 {(status?.owned_agent_ids || []).map((id) => (
                   <option key={id} value={id}>
@@ -507,10 +507,10 @@ export function SelfTab() {
               </select>
             </label>
             <label className="block text-xs md:col-span-2">
-              <span className="text-zinc-400">
+              <span className="text-bh-mute">
                 Card endpoints come from the AXL pubkey + HTTP endpoint above
               </span>
-              <p className="mt-1 text-zinc-500">
+              <p className="mt-1 text-bh-mute-2">
                 Edit those fields to change what gets published. The new <code>data:</code> URI
                 is built fresh on every click.
               </p>
@@ -520,7 +520,7 @@ export function SelfTab() {
             <button
               onClick={() => onUpdateCard("dry-run")}
               disabled={updating || updateAgentId == null}
-              className="rounded bg-zinc-800/60 px-3 py-1.5 text-sm text-zinc-300 ring-1 ring-zinc-700 hover:bg-zinc-800 disabled:opacity-50"
+              className="rounded bg-bh-paper-soft/80 px-3 py-1.5 text-sm text-bh-ink-soft ring-1 ring-bh-line-strong hover:bg-bh-paper-soft disabled:opacity-50"
             >
               {updating ? "Submitting…" : "Preview (dry-run)"}
             </button>
@@ -537,7 +537,7 @@ export function SelfTab() {
                     ? "Server signs with the operator PRIVATE_KEY"
                     : "Connect a wallet (or set PRIVATE_KEY) to broadcast"
               }
-              className="rounded bg-emerald-500/20 px-3 py-1.5 text-sm font-medium text-emerald-200 ring-1 ring-emerald-400/30 hover:bg-emerald-500/30 disabled:opacity-50"
+              className="rounded bg-bh-blue-bright/25 px-3 py-1.5 text-sm font-medium text-bh-blue ring-1 ring-bh-blue-bright/40 hover:bg-bh-blue-bright/40 disabled:opacity-50"
             >
               {updating || updateSubmit.state.kind === "submitting"
                 ? "Submitting…"
@@ -552,14 +552,14 @@ export function SelfTab() {
             followUpLabel="card update will be visible after the tx confirms"
           />
           {updateError && (
-            <pre className="mt-3 whitespace-pre-wrap rounded border border-rose-900 bg-rose-950/40 p-3 text-xs text-rose-200">
+            <pre className="mt-3 whitespace-pre-wrap rounded border border-bh-red/40 bg-bh-red/10 p-3 text-xs text-bh-red">
               {updateError}
             </pre>
           )}
           {updateResult && (
             <div className="mt-3 space-y-2 text-xs">
               <div className="flex items-center gap-2">
-                <span className="text-zinc-500">mode:</span>
+                <span className="text-bh-mute-2">mode:</span>
                 <ModeBadge
                   live={updateResult.mode === "live"}
                   label={
@@ -570,26 +570,26 @@ export function SelfTab() {
                         : "dry-run"
                   }
                 />
-                <span className="text-zinc-500">agent #{updateResult.agent_id}</span>
+                <span className="text-bh-mute-2">agent #{updateResult.agent_id}</span>
               </div>
               {updateResult.mode === "error" && (
-                <pre className="whitespace-pre-wrap rounded border border-rose-900 bg-rose-950/40 p-3 text-rose-200">
+                <pre className="whitespace-pre-wrap rounded border border-bh-red/40 bg-bh-red/10 p-3 text-bh-red">
                   {updateResult.error}
                 </pre>
               )}
               {updateResult.mode === "live" && updateResult.tx_hash && (
-                <p className="text-zinc-300">
+                <p className="text-bh-ink-soft">
                   tx:{" "}
                   <a
                     href={txUrl({ chain_id: status?.chain_id ?? 84532 }, updateResult.tx_hash)}
                     target="_blank"
                     rel="noreferrer"
-                    className="break-all font-mono text-emerald-300 hover:underline"
+                    className="break-all font-mono text-bh-blue hover:underline"
                   >
                     {updateResult.tx_hash}
                   </a>
                   {updateResult.status === 1 && (
-                    <span className="ml-2 rounded bg-emerald-500/20 px-2 py-0.5 text-emerald-200 ring-1 ring-emerald-400/30">
+                    <span className="ml-2 rounded bg-bh-blue-bright/25 px-2 py-0.5 text-bh-blue ring-1 ring-bh-blue-bright/40">
                       card updated · agent #{updateResult.agent_id}
                     </span>
                   )}
@@ -597,12 +597,12 @@ export function SelfTab() {
               )}
               {updateResult.mode === "dry_run" && (
                 <>
-                  <p className="text-zinc-400">
+                  <p className="text-bh-mute">
                     to:{" "}
-                    <code className="break-all font-mono text-emerald-300">{updateResult.to}</code>
+                    <code className="break-all font-mono text-bh-blue">{updateResult.to}</code>
                   </p>
                   <details>
-                    <summary className="cursor-pointer text-zinc-400 hover:text-zinc-200">
+                    <summary className="cursor-pointer text-bh-mute hover:text-bh-ink">
                       show calldata ({updateResult.calldata?.length ?? 0} chars)
                     </summary>
                     <CodeBlock>{updateResult.calldata}</CodeBlock>
@@ -614,12 +614,12 @@ export function SelfTab() {
         </section>
       )}
 
-      <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
-        <h3 className="mb-2 text-sm font-medium text-zinc-400">ENS resolver</h3>
-        <p className="mb-3 text-xs text-zinc-500">
+      <section className="rounded-lg border border-bh-line-strong bg-bh-paper/50 p-5">
+        <h3 className="mb-2 text-sm font-medium text-bh-mute">ENS resolver</h3>
+        <p className="mb-3 text-xs text-bh-mute-2">
           Reverse-resolves an Ethereum address to its primary ENS name (or forward-resolves a
           name to an address). ENS contracts live on Ethereum mainnet, so this hits the
-          <code className="ml-1 rounded bg-zinc-800 px-1">ENS_RPC_URL</code> endpoint, not the
+          <code className="ml-1 rounded bg-bh-paper-soft px-1">ENS_RPC_URL</code> endpoint, not the
           Base RPC.
         </p>
         <div className="flex flex-wrap items-center gap-2">
@@ -627,18 +627,18 @@ export function SelfTab() {
             value={ensInput}
             onChange={(e) => setEnsInput(e.target.value)}
             placeholder="0x… or name.eth"
-            className="flex-1 rounded border border-zinc-700 bg-zinc-950/40 px-2 py-1.5 font-mono text-[12px] text-zinc-200"
+            className="flex-1 rounded border border-bh-line-strong bg-bh-canvas/40 px-2 py-1.5 font-mono text-[12px] text-bh-ink"
           />
           <button
             onClick={onResolveEns}
             disabled={ensLoading || !ensInput}
-            className="rounded bg-zinc-800/60 px-3 py-1.5 text-sm text-zinc-300 ring-1 ring-zinc-700 hover:bg-zinc-800 disabled:opacity-50"
+            className="rounded bg-bh-paper-soft/80 px-3 py-1.5 text-sm text-bh-ink-soft ring-1 ring-bh-line-strong hover:bg-bh-paper-soft disabled:opacity-50"
           >
             {ensLoading ? "Resolving…" : "Resolve"}
           </button>
         </div>
         {ensError && (
-          <pre className="mt-3 whitespace-pre-wrap rounded border border-rose-900 bg-rose-950/40 p-3 text-xs text-rose-200">
+          <pre className="mt-3 whitespace-pre-wrap rounded border border-bh-red/40 bg-bh-red/10 p-3 text-xs text-bh-red">
             {ensError}
           </pre>
         )}
@@ -646,20 +646,20 @@ export function SelfTab() {
           <dl className="mt-3 space-y-1 text-xs">
             {ensResult.address && (
               <div className="flex justify-between">
-                <dt className="text-zinc-500">address</dt>
-                <dd className="break-all font-mono text-emerald-300">{ensResult.address}</dd>
+                <dt className="text-bh-mute-2">address</dt>
+                <dd className="break-all font-mono text-bh-blue">{ensResult.address}</dd>
               </div>
             )}
             {ensResult.name !== undefined && (
               <div className="flex justify-between">
-                <dt className="text-zinc-500">primary name</dt>
-                <dd className="text-zinc-200">{ensResult.name || "(none)"}</dd>
+                <dt className="text-bh-mute-2">primary name</dt>
+                <dd className="text-bh-ink">{ensResult.name || "(none)"}</dd>
               </div>
             )}
             {ensResult.forward_address && (
               <div className="flex justify-between">
-                <dt className="text-zinc-500">forward → address</dt>
-                <dd className="break-all font-mono text-emerald-300">{ensResult.forward_address}</dd>
+                <dt className="text-bh-mute-2">forward → address</dt>
+                <dd className="break-all font-mono text-bh-blue">{ensResult.forward_address}</dd>
               </div>
             )}
           </dl>
