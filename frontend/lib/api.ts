@@ -195,7 +195,7 @@ export type SettlementStatus = {
 };
 
 export type SettlementResult = {
-  mode: "stub" | "live-mcp" | "live-api";
+  mode: "stub" | "live" | "live-unreachable";
   workflow_id: string;
   status: "executed" | "pending" | "failed";
   agent_wallet: string;
@@ -249,9 +249,9 @@ export type SetupStatus = {
     mode: "live" | "stub";
     network: string;
     token: string;
-    mcp_url: string;
-    mcp_reachable: boolean;
-    mcp_error: string | null;
+    api_url: string;
+    api_reachable: boolean;
+    api_error: string | null;
   };
   cache: {
     agents_in_cache: number;

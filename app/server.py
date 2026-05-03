@@ -456,25 +456,32 @@ def setup_status():
     except Exception as e:
         ens_status = {"ok": False, "error": f"{type(e).__name__}: {e}"}
 
-    # ----- KeeperHub: probe MCP transport reachability --------------------
-    mcp_url = os.getenv("KEEPERHUB_MCP_URL", "http://127.0.0.1:8787")
-    mcp_reachable = False
-    mcp_error: str | None = None
+    # ----- KeeperHub: probe REST API reachability -------------------------
+    # KeeperHub's hosted REST API at app.keeperhub.com/api takes a Bearer
+    # `kh_*` org key and exposes /api/execute/transfer for one-shot settlements
+    # (see keeper_client._live_settle). We probe the host root with a HEAD so
+    # we can light up the dashboard's "live ready" checklist without spending
+    # an actual auth token.
+    api_url = os.getenv("KEEPERHUB_API_URL", "https://app.keeperhub.com/api")
+    api_reachable = False
+    api_error: str | None = None
     if has_keeper_key:
         try:
-            r = http_requests.get(mcp_url + "/health", timeout=2.0)
-            mcp_reachable = r.status_code < 500
+            # GET /api with no auth: a 401/403 still counts as "reachable" —
+            # we just want to know the host responds at all.
+            r = http_requests.get(api_url, timeout=2.5)
+            api_reachable = r.status_code < 500
         except http_requests.exceptions.RequestException as e:
-            mcp_error = f"{type(e).__name__}: {str(e)[:140]}"
+            api_error = f"{type(e).__name__}: {str(e)[:140]}"
 
     keeperhub = {
         "api_key_configured": has_keeper_key,
         "mode": "live" if has_keeper_key else "stub",
         "network": KEEPERHUB_NETWORK,
         "token": KEEPERHUB_PAYER_TOKEN,
-        "mcp_url": mcp_url,
-        "mcp_reachable": mcp_reachable,
-        "mcp_error": mcp_error,
+        "api_url": api_url,
+        "api_reachable": api_reachable,
+        "api_error": api_error,
     }
 
     # ----- registry cache snapshot (so wizard can show "scan in progress") -
@@ -492,7 +499,7 @@ def setup_status():
     # Each "ready" maps to a checklist step the dashboard renders. The wizard
     # treats `core_ready` as "user can use the dashboard end-to-end".
     core_ready = signer["valid"] and (signer.get("balance_eth") or 0) >= 0.0005
-    keeper_ready = bool(has_keeper_key and mcp_reachable)
+    keeper_ready = bool(has_keeper_key and api_reachable)
 
     return jsonify({
         "network": NETWORK,

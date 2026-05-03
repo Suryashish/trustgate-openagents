@@ -687,7 +687,7 @@ function KeeperHubReadinessPanel() {
     return (
       <section className="rounded border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-emerald-200">
         ✓ KeeperHub live mode ready — API key configured and{" "}
-        <code className="rounded bg-zinc-800/60 px-1">{setup.keeperhub.mcp_url}</code> reachable.
+        <code className="rounded bg-zinc-800/60 px-1">{setup.keeperhub.api_url}</code> reachable.
         Settlements below will broadcast for real.
       </section>
     );
@@ -706,16 +706,16 @@ function KeeperHubReadinessPanel() {
     );
   }
 
-  // The interesting case: API key set but MCP unreachable.
+  // The interesting case: API key set but the KeeperHub host is unreachable.
   return (
     <section className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-sm font-medium text-amber-200">KeeperHub: 1 step left to go live</h3>
+          <h3 className="text-sm font-medium text-amber-200">KeeperHub: API host unreachable</h3>
           <p className="mt-1 text-[11px] text-zinc-400">
-            API key is set, but neither{" "}
-            <code className="rounded bg-zinc-800/60 px-1">{setup.keeperhub.mcp_url}</code> nor the
-            public REST host is reachable. Settlements will return{" "}
+            API key is set, but{" "}
+            <code className="rounded bg-zinc-800/60 px-1">{setup.keeperhub.api_url}</code> isn't
+            responding. Settlements will return{" "}
             <code className="rounded bg-zinc-800/60 px-1">live-unreachable</code> until this is fixed.
           </p>
         </div>
@@ -738,9 +738,9 @@ function KeeperHubReadinessPanel() {
         <li className="flex gap-2">
           <span className="mr-1 inline-block w-3 text-center font-mono text-amber-400">!</span>
           <div className="flex-1">
-            <div className="text-zinc-200">Fund a KeeperHub-managed wallet (manual)</div>
+            <div className="text-zinc-200">Fund the KeeperHub org wallet (manual)</div>
             <div className="text-[11px] text-zinc-500">
-              top up the workflow source wallet with{" "}
+              top up the org's source wallet with{" "}
               <code className="rounded bg-zinc-800/60 px-1">{setup.keeperhub.token}</code> on{" "}
               <code className="rounded bg-zinc-800/60 px-1">{setup.keeperhub.network}</code> at{" "}
               <a
@@ -758,22 +758,25 @@ function KeeperHubReadinessPanel() {
         <li className="flex gap-2">
           <span className="mr-1 inline-block w-3 text-center font-mono text-rose-400">✗</span>
           <div className="flex-1">
-            <div className="text-zinc-200">Run / point at a KeeperHub MCP server</div>
+            <div className="text-zinc-200">Reach KeeperHub's REST API</div>
             <div className="text-[11px] text-zinc-500">
-              install per{" "}
+              the backend POSTs to{" "}
+              <code className="rounded bg-zinc-800/60 px-1">/api/execute/transfer</code> on{" "}
+              <code className="rounded bg-zinc-800/60 px-1">{setup.keeperhub.api_url}</code>. If
+              you're behind egress restrictions or want to override the host, set{" "}
+              <code className="rounded bg-zinc-800/60 px-1">KEEPERHUB_API_URL</code> in{" "}
+              <code className="rounded bg-zinc-800/60 px-1">.env</code>. See{" "}
               <a
-                href="https://docs.keeperhub.com/ai-tools"
+                href="https://docs.keeperhub.com/api/direct-execution"
                 target="_blank"
                 rel="noreferrer"
                 className="text-emerald-400 hover:underline"
               >
-                docs.keeperhub.com/ai-tools
+                docs.keeperhub.com/api/direct-execution
               </a>
-              , or set{" "}
-              <code className="rounded bg-zinc-800/60 px-1">KEEPERHUB_MCP_URL</code> in{" "}
-              <code className="rounded bg-zinc-800/60 px-1">.env</code> to a reachable host.
-              {setup.keeperhub.mcp_error && (
-                <span className="block mt-1 text-rose-300">{setup.keeperhub.mcp_error}</span>
+              .
+              {setup.keeperhub.api_error && (
+                <span className="block mt-1 text-rose-300">{setup.keeperhub.api_error}</span>
               )}
             </div>
           </div>

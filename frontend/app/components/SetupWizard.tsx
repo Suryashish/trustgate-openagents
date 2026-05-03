@@ -85,7 +85,7 @@ function deriveSteps(s: SetupStatus | null): {
   const keeperKey: StepState = s.keeperhub.api_key_configured ? "ok" : "warn";
   const keeperMcp: StepState = !s.keeperhub.api_key_configured
     ? "warn"
-    : s.keeperhub.mcp_reachable
+    : s.keeperhub.api_reachable
       ? "ok"
       : "missing";
 
@@ -275,37 +275,37 @@ export function SetupWizard() {
           <Step
             state={steps.keeperMcp}
             title={
-              status?.keeperhub.mcp_reachable
-                ? "KeeperHub MCP server reachable"
+              status?.keeperhub.api_reachable
+                ? "KeeperHub REST API reachable"
                 : status?.keeperhub.api_key_configured
-                  ? "Run / point at a KeeperHub MCP server"
+                  ? "Reach KeeperHub's REST API"
                   : "(skipped — no API key)"
             }
           >
             {!status?.keeperhub.api_key_configured ? (
               <>—</>
-            ) : status?.keeperhub.mcp_reachable ? (
+            ) : status?.keeperhub.api_reachable ? (
               <>
-                <code className="rounded bg-zinc-800 px-1">{status.keeperhub.mcp_url}</code> responded
+                <code className="rounded bg-zinc-800 px-1">{status.keeperhub.api_url}</code> responded
               </>
             ) : (
               <>
-                neither{" "}
-                <code className="rounded bg-zinc-800 px-1">{status.keeperhub.mcp_url}</code>
-                {" "}nor the public REST host is reachable. See{" "}
+                <code className="rounded bg-zinc-800 px-1">{status.keeperhub.api_url}</code>
+                {" "}isn't reachable. The backend uses{" "}
+                <code className="rounded bg-zinc-800 px-1">/api/execute/transfer</code> — see{" "}
                 <a
-                  href="https://docs.keeperhub.com/ai-tools"
+                  href="https://docs.keeperhub.com/api/direct-execution"
                   target="_blank"
                   rel="noreferrer"
                   className="text-emerald-400 hover:underline"
                 >
-                  docs.keeperhub.com/ai-tools
-                </a>{" "}
-                to install the MCP server, or set{" "}
-                <code className="rounded bg-zinc-800 px-1">KEEPERHUB_MCP_URL</code> in{" "}
-                <code className="rounded bg-zinc-800 px-1">.env</code>.
-                {status?.keeperhub.mcp_error && (
-                  <span className="block mt-1 text-rose-300">{status.keeperhub.mcp_error}</span>
+                  docs.keeperhub.com/api/direct-execution
+                </a>
+                . Override the host with{" "}
+                <code className="rounded bg-zinc-800 px-1">KEEPERHUB_API_URL</code> in{" "}
+                <code className="rounded bg-zinc-800 px-1">.env</code> if needed.
+                {status?.keeperhub.api_error && (
+                  <span className="block mt-1 text-rose-300">{status.keeperhub.api_error}</span>
                 )}
               </>
             )}
@@ -317,7 +317,7 @@ export function SetupWizard() {
         <div className="mt-4 grid gap-2 sm:grid-cols-3">
           <ReadyPill on={status.ready.stub_demo} label="Stub demo" hint="Run a sample hire (no wallet, no gas)" />
           <ReadyPill on={status.ready.core} label="Core live" hint="register, giveFeedback work onchain" />
-          <ReadyPill on={status.ready.keeperhub_live} label="KeeperHub live" hint="settle_payment broadcasts via MCP" />
+          <ReadyPill on={status.ready.keeperhub_live} label="KeeperHub live" hint="settle_payment broadcasts via REST API" />
         </div>
       )}
     </section>

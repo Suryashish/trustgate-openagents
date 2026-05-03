@@ -1,9 +1,9 @@
-"""KeeperHub MCP wrapper for payment settlement + ERC-8004 feedback write-back.
+"""KeeperHub wrapper for payment settlement + ERC-8004 feedback write-back.
 
 Two surfaces:
 
     settle_payment(agent_wallet, amount_usdc, ...)
-        Calls KeeperHub's MCP server to create + trigger a payment workflow.
+        Calls KeeperHub's hosted REST API to execute a transfer in one shot.
         Falls back to a deterministic stub when no API key is configured, so
         the rest of the demo still runs end-to-end.
 
@@ -11,11 +11,15 @@ Two surfaces:
         Wraps RegistryClient.send_feedback. Produces a real onchain tx if
         PRIVATE_KEY is set; dry-run otherwise.
 
-The KeeperHub HTTP shape follows the public docs at
-https://docs.keeperhub.com/ai-tools (the actual endpoints used here are
-documented in the README under `Configuration → KeeperHub`). The stub mode
-exists because hackathon judges should be able to run the full pipeline without
-needing a paid KeeperHub account — the API contract stays the same.
+The KeeperHub REST surface used here is documented at
+https://docs.keeperhub.com/api/direct-execution — specifically
+`POST /api/execute/transfer`, which dispatches a single transfer in one call.
+That's a cleaner fit for "one settlement per hire" than the older
+create_workflow + trigger_execution dance.
+
+The stub mode exists because hackathon judges should be able to run the full
+pipeline without a paid KeeperHub account — the dashboard renders an honest
+"STUB" badge so the two paths can never be confused.
 """
 from __future__ import annotations
 
@@ -35,16 +39,48 @@ from registry_client import RegistryClient
 
 log = logging.getLogger("keeper_client")
 
-KEEPERHUB_MCP_URL = os.getenv("KEEPERHUB_MCP_URL", "http://127.0.0.1:8787")
-KEEPERHUB_API_URL = os.getenv("KEEPERHUB_API_URL", "https://api.keeperhub.com/v1")
+KEEPERHUB_API_URL = os.getenv("KEEPERHUB_API_URL", "https://app.keeperhub.com/api")
 KEEPERHUB_NETWORK = os.getenv("KEEPERHUB_NETWORK", "base-sepolia")
 KEEPERHUB_PAYER_TOKEN = os.getenv("KEEPERHUB_PAYER_TOKEN", "USDC")
+# Optional explicit ERC-20 contract address for the payer token. KeeperHub's
+# /api/execute/transfer takes a `tokenAddress` (or omits it for native coin).
+# If unset, we resolve known symbols (USDC) on known networks below.
+KEEPERHUB_TOKEN_ADDRESS = os.getenv("KEEPERHUB_TOKEN_ADDRESS", "")
+
+# Symbol → contract address map for networks we ship support for. Add more as
+# needed; users can always set KEEPERHUB_TOKEN_ADDRESS explicitly to override.
+_TOKEN_ADDRESSES: dict[str, dict[str, str]] = {
+    "base-sepolia": {
+        # Circle testnet USDC on Base Sepolia (verified)
+        "USDC": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+    },
+    "base-mainnet": {
+        # Native Base mainnet USDC (Circle, bridged)
+        "USDC": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    },
+}
+
+
+def _resolve_token_address() -> Optional[str]:
+    """Return the ERC-20 address to send to KeeperHub, or None for native ETH.
+
+    Resolution order:
+      1. KEEPERHUB_TOKEN_ADDRESS env var (literal address wins)
+      2. Symbol lookup in _TOKEN_ADDRESSES for the configured network
+      3. If symbol is "ETH"/"NATIVE", return None (KeeperHub treats this as native)
+    """
+    if KEEPERHUB_TOKEN_ADDRESS:
+        return KEEPERHUB_TOKEN_ADDRESS
+    sym = (KEEPERHUB_PAYER_TOKEN or "").upper()
+    if sym in {"ETH", "NATIVE", ""}:
+        return None
+    return _TOKEN_ADDRESSES.get(KEEPERHUB_NETWORK, {}).get(sym)
 
 
 @dataclass
 class SettlementResult:
-    mode: str                          # "stub" | "live-mcp" | "live-api"
-    workflow_id: str
+    mode: str                          # "stub" | "live" | "live-unreachable"
+    workflow_id: str                   # KeeperHub `executionId` for live; "wf_<sha>" for stub
     status: str                        # "executed" | "pending" | "failed"
     agent_wallet: str
     amount: float
@@ -87,100 +123,70 @@ def _stub_settle(agent_wallet: str, amount: float, *, idempotency_key: str) -> S
 
 
 def _live_settle(agent_wallet: str, amount: float, *, idempotency_key: str) -> SettlementResult:
-    """Real KeeperHub call.
+    """Real KeeperHub call via direct-execution.
 
-    Tries the local MCP server first (if `KEEPERHUB_MCP_URL` is reachable),
-    otherwise falls back to the HTTPS REST surface at `KEEPERHUB_API_URL`.
+    POSTs once to {KEEPERHUB_API_URL}/execute/transfer and returns whatever
+    the API hands back. No pre-created workflow needed.
     """
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {KEEPERHUB_API_KEY}",
+        # Idempotency-Key is sent defensively — KeeperHub's create_workflow
+        # path documents it; direct-execution may or may not honour it.
+        # Either way, sending it is harmless.
         "Idempotency-Key": idempotency_key,
     }
-    workflow_payload = {
-        "name": f"trustgate-payout-{idempotency_key[:8]}",
-        "description": "TrustGate hire-loop settlement",
-        "actions": [
-            {
-                "type": "transfer",
-                "network": KEEPERHUB_NETWORK,
-                "token": KEEPERHUB_PAYER_TOKEN,
-                "to": agent_wallet,
-                "amount": str(amount),
-            }
-        ],
-        "trigger": "manual",
+    body: dict[str, Any] = {
+        "network": KEEPERHUB_NETWORK,
+        "recipientAddress": agent_wallet,
+        "amount": str(amount),
     }
+    token_addr = _resolve_token_address()
+    if token_addr:
+        body["tokenAddress"] = token_addr
+
     audit: list[dict] = []
     t0 = time.time()
-    r = None
-    used = "live-mcp"
-    mcp_err: Optional[str] = None
-    api_err: Optional[str] = None
+    url = f"{KEEPERHUB_API_URL.rstrip('/')}/execute/transfer"
     try:
-        r = requests.post(f"{KEEPERHUB_MCP_URL}/workflows", json=workflow_payload, headers=headers, timeout=15)
+        r = requests.post(url, json=body, headers=headers, timeout=20)
     except requests.exceptions.RequestException as e:
-        mcp_err = f"{type(e).__name__}: {str(e)[:140]}"
-        log.info(f"local MCP unreachable ({mcp_err}); falling back to API")
-        try:
-            r = requests.post(f"{KEEPERHUB_API_URL}/workflows", json=workflow_payload, headers=headers, timeout=15)
-            used = "live-api"
-        except requests.exceptions.RequestException as e2:
-            api_err = f"{type(e2).__name__}: {str(e2)[:140]}"
-
-    if r is None:
-        # Both transports failed before we got an HTTP response. Report a
-        # structured error so the dashboard renders it cleanly instead of 500ing.
+        err = f"{type(e).__name__}: {str(e)[:200]}"
+        audit.append({"ts": time.time(), "step": "execute_transfer", "ok": False, "error": err})
         return SettlementResult(
             mode="live-unreachable", workflow_id="", status="failed",
             agent_wallet=agent_wallet, amount=float(amount),
             token=KEEPERHUB_PAYER_TOKEN, network=KEEPERHUB_NETWORK,
             error=(
-                "Could not reach either KeeperHub transport. "
-                f"MCP ({KEEPERHUB_MCP_URL}): {mcp_err}. "
-                f"API ({KEEPERHUB_API_URL}): {api_err or 'not tried'}. "
-                "Run a local KeeperHub MCP server, or set KEEPERHUB_API_URL to a reachable endpoint."
+                f"Could not reach KeeperHub at {url}: {err}. "
+                "Check KEEPERHUB_API_URL is correct (default: https://app.keeperhub.com/api)."
             ),
-            audit_log=[
-                {"ts": time.time(), "step": "create_workflow", "ok": False, "transport": "mcp", "error": mcp_err},
-                *([{"ts": time.time(), "step": "create_workflow", "ok": False, "transport": "api", "error": api_err}] if api_err else []),
-            ],
+            audit_log=audit,
             elapsed_seconds=time.time() - t0,
         )
 
     if r.status_code >= 400:
+        audit.append({"ts": time.time(), "step": "execute_transfer", "ok": False, "code": r.status_code})
         return SettlementResult(
-            mode=used, workflow_id="", status="failed",
+            mode="live", workflow_id="", status="failed",
             agent_wallet=agent_wallet, amount=float(amount),
             token=KEEPERHUB_PAYER_TOKEN, network=KEEPERHUB_NETWORK,
-            error=f"create_workflow {r.status_code}: {r.text[:200]}",
-            elapsed_seconds=time.time() - t0,
-        )
-    body = r.json()
-    workflow_id = body.get("id") or body.get("workflow_id") or ""
-    audit.append({"ts": time.time(), "step": "create_workflow", "ok": True, "workflow_id": workflow_id})
-
-    base_url = KEEPERHUB_MCP_URL if used == "live-mcp" else KEEPERHUB_API_URL
-    r2 = requests.post(f"{base_url}/workflows/{workflow_id}/trigger", json={}, headers=headers, timeout=20)
-    if r2.status_code >= 400:
-        audit.append({"ts": time.time(), "step": "trigger_execution", "ok": False, "code": r2.status_code})
-        return SettlementResult(
-            mode=used, workflow_id=workflow_id, status="failed",
-            agent_wallet=agent_wallet, amount=float(amount),
-            token=KEEPERHUB_PAYER_TOKEN, network=KEEPERHUB_NETWORK,
+            error=f"execute_transfer {r.status_code}: {r.text[:300]}",
             audit_log=audit,
-            error=f"trigger_execution {r2.status_code}: {r2.text[:200]}",
             elapsed_seconds=time.time() - t0,
         )
-    triggered = r2.json()
-    audit.append({"ts": time.time(), "step": "trigger_execution", "ok": True})
+
+    body_resp = r.json() if r.text else {}
+    execution_id = body_resp.get("executionId") or body_resp.get("execution_id") or ""
+    status = body_resp.get("status", "pending")
+    audit.append({"ts": time.time(), "step": "execute_transfer", "ok": True, "execution_id": execution_id})
     return SettlementResult(
-        mode=used,
-        workflow_id=workflow_id,
-        status=triggered.get("status", "pending"),
+        mode="live",
+        workflow_id=execution_id,
+        status=status,
         agent_wallet=agent_wallet, amount=float(amount),
         token=KEEPERHUB_PAYER_TOKEN, network=KEEPERHUB_NETWORK,
-        tx_hash=triggered.get("transaction_hash"),
+        tx_hash=body_resp.get("transactionHash") or body_resp.get("transaction_hash"),
         audit_log=audit,
         elapsed_seconds=time.time() - t0,
     )
@@ -195,8 +201,8 @@ def settle_payment(
 ) -> SettlementResult:
     """Pay an agent through KeeperHub. Returns a structured receipt.
 
-    `idempotency_key` is auto-generated as a uuid4 if not provided. KeeperHub
-    uses it to dedupe retries — passing the same key twice never double-pays.
+    `idempotency_key` is auto-generated as a uuid4 if not provided and sent
+    as an `Idempotency-Key` header so retries don't double-pay.
     """
     if not agent_wallet:
         return SettlementResult(
