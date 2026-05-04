@@ -35,13 +35,14 @@ Built for **ETHGlobal OpenAgents** (April 24 – May 6, 2026).
 8. [Configuration reference](#8-configuration-reference)
 9. [Gensyn AXL — deep dive](#9-gensyn-axl--deep-dive)
 10. [KeeperHub — deep dive](#10-keeperhub--deep-dive)
-11. [CLI smoke tests](#11-cli-smoke-tests)
-12. [Hosted deployment](#12-hosted-deployment)
-13. [Repository layout](#13-repository-layout)
-14. [Live contracts](#14-live-contracts)
-15. [Troubleshooting](#15-troubleshooting)
-16. [What's next](#16-whats-next)
-17. [Credits & license](#17-credits--license)
+11. [KeeperHub feedback track — integration challenges & inefficiencies](#11-keeperhub-feedback-track--integration-challenges--inefficiencies)
+12. [CLI smoke tests](#12-cli-smoke-tests)
+13. [Hosted deployment](#13-hosted-deployment)
+14. [Repository layout](#14-repository-layout)
+15. [Live contracts](#15-live-contracts)
+16. [Troubleshooting](#16-troubleshooting)
+17. [What's next](#17-whats-next)
+18. [Credits & license](#18-credits--license)
 
 ---
 
@@ -550,7 +551,259 @@ PYTHONPATH=app .venv/bin/python -u app/phase5_test.py loop --payee-wallet 0xWall
 
 ---
 
-## 11. CLI smoke tests
+## 11. KeeperHub feedback track — integration challenges & inefficiencies
+
+> *This section is included for **KeeperHub feedback track** eligibility.*
+> Honest, organised notes on what fought us during the build and what we
+> think KeeperHub could improve. We shipped a working integration; this is
+> the friction that came with it. Most items below are **documentation / DX
+> fixes, not engine problems** — once the right endpoint is found, the API
+> itself is genuinely simple.
+
+### 11.1 Documentation surface vs. reality (the single biggest delay)
+
+The blueprint we started from referenced `https://api.keeperhub.com/v1` plus a
+local MCP sidecar at `http://127.0.0.1:8787`, modelled as a two‑step
+`create_workflow` → `trigger_execution` flow. **None of that matched what
+KeeperHub actually ships:**
+
+* The hosted REST surface lives at `https://app.keeperhub.com/api`, *not*
+  `api.keeperhub.com/v1`.
+* `/api/execute/transfer` is a **single‑call** endpoint per
+  [docs.keeperhub.com/api/direct-execution](https://docs.keeperhub.com/api/direct-execution).
+  The `create_workflow` + `trigger_execution` two‑step is a different (older /
+  heavier) pattern; for "pay one worker after one hire" it's the wrong tool.
+* There is **no MCP sidecar required** for headless server‑side integration —
+  the REST API is what you want. The MCP narrative is for Claude Code‑style
+  integrations and is misleading when you arrive looking for "how do I pay an
+  agent from a Python backend" answers.
+
+We lost a phase rebuilding `app/keeper_client.py` after the first end‑to‑end
+live attempt 404'd. Once the right URL was found, the whole integration
+collapsed to ~50 lines (Phase 12.1).
+
+**Suggested fix.** A single "REST quickstart" page that says verbatim: *"To
+dispatch one transfer, POST `/api/execute/transfer` to
+`https://app.keeperhub.com/api`. Auth: `Bearer kh_*`. That's it. Use this
+95 % of the time."* Surface that link from the front page of the docs.
+
+### 11.2 API‑key scope ambiguity (`wfb_*` vs. `kh_*`)
+
+KeeperHub issues two key types from the dashboard: user‑scoped `wfb_*` and
+organisation‑scoped `kh_*`. The `/api/execute/transfer` endpoint **only
+accepts `kh_*`** ([auth docs](https://docs.keeperhub.com/api/authentication)).
+The dashboard surfaces both in the same UI without clearly tying each one to
+the endpoints it can call.
+
+We discovered this by getting a 401 on the first live call and reading the
+auth docs closely. Until then we had been pasting the user‑scoped key from the
+most prominent "Create API Key" button.
+
+**Suggested fix.** Either (a) auto‑route both scopes to the right behaviour,
+or (b) badge each endpoint in the API reference with the scope it requires,
+or (c) name the keys differently in the dashboard
+("**Org execution key** (`kh_…`)" vs. "**Personal token** (`wfb_…`)").
+
+### 11.3 Source‑of‑funds is the org‑managed wallet, not the API key's EOA
+
+Counter‑intuitive for anyone coming from "API key authenticates an action that
+spends the caller's EOA". With KeeperHub, transfers debit a **KeeperHub‑managed
+organisation wallet** that you top up via the dashboard. If the org wallet is
+empty, the call still returns shaped responses with a non‑`completed` status —
+we had to detect that and surface it as "needs funding" in the UI.
+
+**Suggested fix.** Reject the call (or 402 Payment Required) when the org
+wallet is empty for the requested token + network, with an explicit
+`error: "org wallet has 0 USDC on base-sepolia, top up at <url>"`. Returning
+success‑shaped responses for unfundable calls makes silent failures
+inevitable.
+
+### 11.4 No pre‑flight credential probe
+
+There is no `/api/auth/whoami` (or equivalent) where a backend can ask *"is
+this key valid, what scope is it, what org does it belong to, what's the
+balance?"* before attempting a real transfer. Today the only way to validate a
+`KEEPERHUB_API_KEY` is to attempt a real settlement and see what the API
+says.
+
+For our `Settle → readiness` panel we worked around this by probing host
+reachability and matching the user's pasted key shape (`kh_` prefix) — neither
+is real validation. Users still don't find out their key is wrong until the
+first live call.
+
+**Suggested fix.** Ship `GET /api/me` or `GET /api/orgs/current` returning
+`{ org_id, scope, wallet_balances, network_allowlist }` and callable with just
+the bearer token. This is the single highest‑leverage doc + endpoint addition
+for SDK builders.
+
+### 11.5 Idempotency semantics not documented for direct‑execution
+
+`Idempotency-Key` is documented for the `create_workflow` path; the
+direct‑execution docs are silent on whether the header is honoured. We send
+`Idempotency-Key: sha256(hire_id + agent_id + amount)` defensively so retries
+can't double‑pay, but we genuinely do not know whether KeeperHub deduplicates
+on it. Without that guarantee, every caller has to implement de‑dup state on
+their own side anyway, which defeats half the purpose of having the header.
+
+**Suggested fix.** State explicitly in the direct‑execution docs:
+* whether `Idempotency-Key` is honoured,
+* the retention window,
+* and what the response shape looks like on a deduplicated retry (200 with the
+  original `executionId`? 409? `replayed: true`?).
+
+### 11.6 No symbol → token‑address resolution
+
+`/api/execute/transfer` takes a `tokenAddress` (or omits it for native). It
+does **not** accept symbols. Every integrator therefore re‑implements their
+own `{network, symbol} → address` map, with the usual failure modes (Circle
+USDC vs. bridged USDC on Base, native vs. wrapped ETH, address case
+sensitivity). We ended up shipping our own `_TOKEN_ADDRESSES` map in
+`app/keeper_client.py` covering the two networks we needed:
+
+```python
+"base-sepolia":  {"USDC": "0x036CbD53842c5426634e7929541eC2318f3dCF7e"}
+"base-mainnet":  {"USDC": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"}
+```
+
+Doable, but boilerplate that every integrator now owns and has to keep in
+sync.
+
+**Suggested fix.** Accept either `tokenAddress` *or* `tokenSymbol` per
+network. KeeperHub already has the org's allowlisted tokens — server‑side
+resolution is less error‑prone than redoing it in every SDK.
+
+### 11.7 Synchronous return without a status webhook
+
+The direct‑execution call returns `executionId` and a `status` in the
+response body. To learn the *final* state of the transfer (mined, reverted,
+dropped), callers must either poll or rely on the synchronous response
+having already settled. There is no documented webhook callback for terminal
+state. For an autonomous‑agent loop where one settlement happens per hire,
+polling adds latency and integration code we'd rather not own.
+
+**Suggested fix.** Optional webhook URL on the org config (or per‑call),
+called once on terminal status. Or a documented long‑polling
+`GET /api/executions/{id}?wait=30s`.
+
+### 11.8 Response field‑name inconsistency
+
+Different endpoints return camelCase vs. snake_case for what looks like the
+same field. Our `_live_settle` defensively reads both:
+
+```python
+execution_id = body_resp.get("executionId") or body_resp.get("execution_id") or ""
+tx_hash      = body_resp.get("transactionHash") or body_resp.get("transaction_hash")
+```
+
+Minor, but it adds noise to every integration and makes the public examples
+ambiguous about which form is canonical.
+
+**Suggested fix.** Pick one convention (camelCase is the JSON default) and
+mark the other as deprecated in the changelog.
+
+### 11.9 No sandbox / dry‑run mode on the API
+
+Every live call costs real testnet gas plus a real ERC‑20 transfer out of the
+org wallet. We built TrustGate's **stub mode** purely because there was no
+KeeperHub‑side affordance for "try the integration without spending
+anything". Stub mode is honest (loud `STUB` badge in the UI, sha‑256‑derived
+fake tx hash that can't be confused with a real one), but a real sandbox
+endpoint that returned realistic‑shaped responses without dispatching would
+have removed the need for it entirely.
+
+**Suggested fix.** A `?dry_run=true` query parameter on
+`/api/execute/transfer` that runs every validation but stops short of actually
+dispatching, returning `{ status: "would_succeed", estimated_tx: {...},
+estimated_gas: ... }`. Reviewers love this; SDK authors save days of "is my
+serialisation right?" loops.
+
+### 11.10 Reachability‑failure shape (and absence of `/api/health`)
+
+When the host is unreachable (egress firewall, DNS hiccup, brief outage), the
+only signal is a `requests.exceptions.RequestException` from the HTTP layer.
+We catch it and emit `mode="live-unreachable"`, which the dashboard surfaces
+as an actionable amber banner. Without that wrapper, the failure would be a
+500 from Flask and the user would see a stack trace instead of a fix.
+
+This handling is on us, not KeeperHub — but a lightweight unauthenticated
+`GET /api/health` we could probe would have made the readiness wizard cleaner
+and let us cleanly distinguish "key is wrong" from "host is down". We
+currently treat HTTP 405 on `GET /api` as "alive enough", which is fragile
+and breaks the moment that path stops 405'ing.
+
+**Suggested fix.** Ship `GET /api/health` returning `{ ok: true, version,
+region }` without auth. Standard SaaS hygiene; saves every integrator a
+coin‑toss on what to probe.
+
+### 11.11 Documentation gaps that cost us hours
+
+* **No worked end‑to‑end example for headless backends.** Most public
+  examples are interactive / dashboard‑driven. A "Python backend dispatches
+  one transfer per business event" recipe would have removed most of the
+  ambiguity above.
+* **No clear statement of which networks ship which tokens out of the box.**
+  We had to reverse‑engineer that USDC works on `base-sepolia` and
+  `base-mainnet` by reading the dashboard's network/token dropdown, then
+  encode the contract addresses ourselves.
+* **The relationship between MCP server, Claude Code plugin, REST API, and
+  SDK** is not laid out anywhere we could find in one place. We'd suggest a
+  single "Choose your integration mode" page that sends each persona to the
+  right surface in <30 seconds.
+* **Error‑code reference is thin.** Some statuses came back as
+  `pending` / `executed` / `failed` and others as `completed` /
+  `not-completed` — the full state machine isn't documented.
+
+### 11.12 Friction we ran into around the dashboard, not the API
+
+Less critical, but caught us on the way to live mode:
+
+* **Org creation flow is buried.** A new account lands on a personal
+  workspace; you only realise you need an organisation when the API key UI
+  surfaces the org tab. A "Create your first org" prompt on signup would
+  remove this trip.
+* **Top‑up confirmation latency.** After topping up the org wallet, balance
+  visibility takes long enough that we hit "insufficient funds" responses
+  before realising the funds had landed. A poll/refresh button on the
+  balances panel would help.
+* **No CLI for org‑level state.** Every check (balance, key list, recent
+  executions) requires a browser session. A simple `keeperhub status`
+  CLI would slot neatly into our setup wizard.
+
+### 11.13 What worked well (so this isn't one‑sided)
+
+* **Once you find the right endpoint, the API is genuinely simple.** One
+  POST, structured response, real onchain settlement. The minimal surface
+  area is the right call.
+* **The `kh_*` Organisation key model fits agent‑to‑agent payments.** A
+  single TrustGate deployment paying many workers from one org‑managed
+  wallet is exactly the right unit of accounting for our use case.
+* **Per‑dispatch transparency is good** — top up the org wallet, see exactly
+  what gets debited per call, no hidden fees. We were able to surface this
+  honestly in the Settle tab without modification.
+* **Graceful auth failures.** When the wrong scope key was used, the API
+  returned a clear 401 / 403, not a misleading 200. That's better than a lot
+  of competing platforms.
+* **Idempotency‑Key is at least *accepted***, even if its semantics on the
+  direct‑execution path aren't documented — the call doesn't reject our
+  defensive header, which kept our retry logic clean.
+
+### 11.14 Net assessment
+
+KeeperHub did the part of TrustGate's pipeline that would have taken weeks to
+build correctly (gas estimation, retries, nonce management, audit trail).
+Once we found the right endpoint, the integration was ~50 lines. The friction
+was almost entirely **discovery and documentation**, not the platform — most
+of the items above are doc / DX fixes, not engine fixes.
+
+If we had a full week with KeeperHub support sitting in a Slack channel, we
+would have been live on day one. The product is closer to ready than the
+surface it presents to first‑time integrators. Closing the doc gaps in
+sections 11.1, 11.2, 11.4, and 11.5 alone would, in our estimation, halve the
+time‑to‑first‑live‑call for the next team that arrives.
+
+---
+
+## 12. CLI smoke tests
 
 If you don't want to bring up the dashboard, every phase ships a CLI:
 
@@ -585,7 +838,7 @@ PYTHONPATH=app .venv/bin/python -u app/phase10_workflows_test.py
 
 ---
 
-## 12. Hosted deployment
+## 13. Hosted deployment
 
 Full recipe in [DEPLOY.md](DEPLOY.md). TL;DR:
 
@@ -597,7 +850,7 @@ End‑users connect their own wallet via RainbowKit; **the public deploy never h
 
 ---
 
-## 13. Repository layout
+## 14. Repository layout
 
 ```
 v1/
@@ -637,7 +890,7 @@ v1/
 
 ---
 
-## 14. Live contracts
+## 15. Live contracts
 
 For explorer cross‑reference. Use [https://8004scan.app](https://8004scan.app) to look up agents from outside the dashboard.
 
@@ -650,7 +903,7 @@ TrustGate itself is **agent #5412** on Base Sepolia.
 
 ---
 
-## 15. Troubleshooting
+## 16. Troubleshooting
 
 | Symptom | Fix |
 |---|---|
@@ -667,7 +920,7 @@ Full hosted‑deploy troubleshooting table is in [DEPLOY.md](DEPLOY.md).
 
 ---
 
-## 16. What's next
+## 17. What's next
 
 The full hiring loop and self‑registration are in place: discovery → ranking → A2A delivery → KeeperHub settlement → onchain feedback → TrustGate is itself a discoverable ERC‑8004 agent. Sensible follow‑ups:
 
@@ -678,7 +931,7 @@ The full hiring loop and self‑registration are in place: discovery → ranking
 
 ---
 
-## 17. Credits & license
+## 18. Credits & license
 
 * **ERC‑8004 contracts & ABIs** — [erc-8004/erc-8004-contracts](https://github.com/erc-8004/erc-8004-contracts).
 * **Gensyn AXL** — [gensyn-ai/axl](https://github.com/gensyn-ai/axl).
