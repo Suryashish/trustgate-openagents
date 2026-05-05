@@ -15,9 +15,7 @@ Built for **ETHGlobal OpenAgents** (April 24 – May 6, 2026).
 
 ## Demo video
 
-> 📺 **Watch the 3‑minute walkthrough:** _Add your YouTube link here_
->
-> `https://youtu.be/REPLACE-ME`
+> 📺 **Watch the 3‑minute walkthrough:** [https://youtu.be/UY-vT6E6Cb0](https://youtu.be/UY-vT6E6Cb0)
 
 ![TrustGate dashboard overview](pictures/1.png)
 
